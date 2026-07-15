@@ -19,9 +19,9 @@ arduino-cli compile --profile adv firmware/cardputer
 ./tools/flash-firmware.sh /dev/cu.usbmodemXXXX
 ```
 
-Use Arduino CLI only for firmware. Do not add PlatformIO, ESP-IDF project
-files, cloud relays, online OTA, multi-board profiles, or direct App Server LAN
-listeners.
+Use Arduino CLI only for firmware. Do not add alternate embedded build-system
+projects, cloud relays, online OTA, multi-board profiles, or direct App Server
+LAN listeners.
 
 ## Safety Boundaries
 
