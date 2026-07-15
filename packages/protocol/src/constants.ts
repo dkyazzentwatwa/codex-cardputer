@@ -1,0 +1,11 @@
+export const PROTOCOL_VERSION = "codexdeck.v1" as const;
+export const DEFAULT_PORT = 8765;
+export const DEVICE_PATH = "/device";
+export const MDNS_SERVICE = "_codexdeck._tcp";
+export const MAX_FRAME_BYTES = 8 * 1024;
+export const HEARTBEAT_SECONDS = 10;
+export const STALE_AFTER_SECONDS = 30;
+export const MAX_SNAPSHOT_TASKS = 20;
+export const MAX_FOLLOWUP_BYTES = 240;
+export const REQUEST_CACHE_SIZE = 100;
+export const REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
