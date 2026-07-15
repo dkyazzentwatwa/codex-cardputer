@@ -5,11 +5,6 @@ profiles:
       - platform: m5stack:esp32
         platform_index_url: https://static-cdn.m5stack.com/resource/arduino/package_m5stack_index.json
     libraries:
-      - dir: lib/ControlDeckCore
-      - M5Cardputer (1.1.1)
-      - M5Unified (0.2.14)
-      - M5GFX (0.2.20)
-      - ArduinoJson (7.4.3)
-      - WebSockets (2.7.2)
+      - dir: ../../cardputer/lib/ControlDeckCore
 
 default_profile: adv

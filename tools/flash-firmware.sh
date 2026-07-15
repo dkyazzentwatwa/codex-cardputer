@@ -13,7 +13,16 @@ if [ -z "$PORT" ]; then
   exit 1
 fi
 
+case "$PORT" in
+  /dev/cu.usbmodem*) ;;
+  *)
+    echo "Refusing non-USB-modem port: $PORT" >&2
+    exit 1
+    ;;
+esac
+
 arduino-cli compile --profile adv "$ROOT/firmware/cardputer"
+echo "proof=compile-ready target=cardputer-adv"
 stty -f "$PORT" 1200 || true
 sleep 1
 NEW_PORT=$(arduino-cli board list | awk '/\/dev\/cu\.usbmodem/ { print $1; exit }')
@@ -21,3 +30,4 @@ if [ -n "$NEW_PORT" ]; then
   PORT=$NEW_PORT
 fi
 arduino-cli upload --profile adv -p "$PORT" "$ROOT/firmware/cardputer"
+echo "proof=uploaded target=cardputer-adv port=$PORT"
