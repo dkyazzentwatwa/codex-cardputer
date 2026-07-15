@@ -1,0 +1,15 @@
+projects:
+  codex-cardputer:
+    label: Codex Cardputer
+    cwd: /Users/cypher/Documents/GitHub/codex-cardputer
+    approvalPolicy: on-request
+    sandbox: workspace-write
+    workflows:
+      review:
+        label: Review changes
+        shortLabel: Review
+        prompt: Review the current changes for correctness, regressions, security risks, and missing tests.
+      test-fix:
+        label: Run and fix tests
+        shortLabel: Fix tests
+        prompt: Run the relevant test suite, diagnose failures, and make the smallest safe fixes.
