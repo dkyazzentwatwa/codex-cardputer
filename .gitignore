@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.cache/
+*.log
+.DS_Store
+.env
+apps/bridge/config/*.local.yaml
+firmware/cardputer/secrets.h
+firmware/tests/**/build/
+build/
