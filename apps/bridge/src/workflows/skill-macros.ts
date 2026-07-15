@@ -12,25 +12,39 @@ export async function discoverSkillMacros(
   workflows: WorkflowRegistry,
   onError?: (projectId: string, error: unknown) => void,
 ): Promise<MacroDescriptor[]> {
-  const macros: MacroDescriptor[] = [];
+  const projectMacros: MacroDescriptor[][] = [];
   for (const project of workflows.list()) {
     try {
       const skills = await appServer.listSkills(project.cwd);
-      for (const skill of skills.sort((left, right) =>
-        left.name.localeCompare(right.name),
-      )) {
-        macros.push({
-          id: `skill:${project.id}/${skill.name}`,
-          label: `${project.label}: ${skill.name}`.slice(0, 48),
-          shortLabel: skill.name.slice(0, 16),
-          action: "launch_skill",
-          confirmation: "none",
-          enabled: true,
-        });
-      }
+      projectMacros.push(
+        skills
+          .sort((left, right) => left.name.localeCompare(right.name))
+          .map((skill) => ({
+            id: `skill:${project.id}/${skill.name}`,
+            label: `${project.label}: ${skill.name}`.slice(0, 48),
+            shortLabel: skill.name.slice(0, 16),
+            action: "launch_skill",
+            confirmation: "none",
+            enabled: true,
+          })),
+      );
     } catch (error) {
+      projectMacros.push([]);
       onError?.(project.id, error);
     }
+  }
+
+  const macros: MacroDescriptor[] = [];
+  for (let index = 0; macros.length < 20; ++index) {
+    let added = false;
+    for (const project of projectMacros) {
+      const macro = project[index];
+      if (!macro) continue;
+      macros.push(macro);
+      added = true;
+      if (macros.length === 20) break;
+    }
+    if (!added) break;
   }
   return macros.slice(0, 20);
 }

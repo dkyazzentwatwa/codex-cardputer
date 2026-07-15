@@ -44,8 +44,11 @@ Edit `workflows.local.yaml`. Every `cwd` must be an existing absolute path.
 Then point `bridge.local.yaml` at it and run:
 
 ```bash
-CODEXDECK_CONFIG=apps/bridge/config/bridge.local.yaml pnpm dev
+./tools/start-bridge.sh
 ```
+
+The helper resolves the local configuration to an absolute path before pnpm
+enters the bridge package directory.
 
 With no `bindHost`, the bridge deterministically chooses the first private IPv4
 interface and falls back to `127.0.0.1` when no private interface exists. Use an
