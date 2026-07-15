@@ -38,8 +38,12 @@ describe("JsonlRpcTransport", () => {
     const written: string[] = [];
     input.on("data", (chunk) => written.push(chunk.toString()));
     const transport = new JsonlRpcTransport(input, output);
-    transport.on("request", (request: AppServerServerRequest) => request.respond({ decision: "accept" }));
-    output.write('{"id":"approval-1","method":"item/fileChange/requestApproval","params":{}}\n');
+    transport.on("request", (request: AppServerServerRequest) =>
+      request.respond({ decision: "accept" }),
+    );
+    output.write(
+      '{"id":"approval-1","method":"item/fileChange/requestApproval","params":{}}\n',
+    );
     await new Promise((resolve) => setImmediate(resolve));
     expect(written.join("")).toContain('"decision":"accept"');
   });

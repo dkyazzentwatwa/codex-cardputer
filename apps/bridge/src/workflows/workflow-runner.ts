@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import type { AppServerThread, AppServerTurn, AppServerUserInput, SkillMetadata } from "../codex/types.js";
+import type {
+  AppServerThread,
+  AppServerTurn,
+  AppServerUserInput,
+  SkillMetadata,
+} from "../codex/types.js";
 import { truncateAtWord } from "../tasks/summary-builder.js";
 import type { ManagedTask } from "../tasks/task-registry.js";
 import type { TaskRegistry } from "../tasks/task-registry.js";
@@ -13,8 +18,15 @@ export interface WorkflowAppServer {
     approvalPolicy?: "untrusted" | "on-request" | "never";
     sandbox?: "read-only" | "workspace-write" | "danger-full-access";
   }): Promise<AppServerThread>;
-  startTurn(threadId: string, input: AppServerUserInput[]): Promise<AppServerTurn>;
-  steerTurn(threadId: string, expectedTurnId: string, input: AppServerUserInput[]): Promise<void>;
+  startTurn(
+    threadId: string,
+    input: AppServerUserInput[],
+  ): Promise<AppServerTurn>;
+  steerTurn(
+    threadId: string,
+    expectedTurnId: string,
+    input: AppServerUserInput[],
+  ): Promise<void>;
   interruptTurn(threadId: string, turnId: string): Promise<void>;
   listSkills(cwd: string): Promise<SkillMetadata[]>;
 }
@@ -30,7 +42,10 @@ export class WorkflowRunner {
     private readonly tasks: TaskRegistry,
   ) {}
 
-  async launchWorkflow(projectId: string, workflowId: string): Promise<ManagedTask> {
+  async launchWorkflow(
+    projectId: string,
+    workflowId: string,
+  ): Promise<ManagedTask> {
     const project = this.workflows.getProject(projectId);
     const workflow = this.workflows.getWorkflow(projectId, workflowId);
     const thread = await this.appServer.startThread({
@@ -52,16 +67,28 @@ export class WorkflowRunner {
       updatedAt: now,
     });
     try {
-      const input = await this.buildInput(project.cwd, workflow.prompt, workflow.skill);
+      const input = await this.buildInput(
+        project.cwd,
+        workflow.prompt,
+        workflow.skill,
+      );
       const turn = await this.appServer.startTurn(thread.id, input);
       return this.tasks.beginTurn(task.id, turn.id);
     } catch (error) {
-      this.tasks.transition(task.id, "failed", error instanceof Error ? error.message : "Workflow failed");
+      this.tasks.transition(
+        task.id,
+        "failed",
+        error instanceof Error ? error.message : "Workflow failed",
+      );
       throw error;
     }
   }
 
-  async launchSkill(projectId: string, skillName: string, prompt?: string): Promise<ManagedTask> {
+  async launchSkill(
+    projectId: string,
+    skillName: string,
+    prompt?: string,
+  ): Promise<ManagedTask> {
     const project = this.workflows.getProject(projectId);
     const thread = await this.appServer.startThread({
       cwd: project.cwd,
@@ -81,11 +108,19 @@ export class WorkflowRunner {
       updatedAt: now,
     });
     try {
-      const input = await this.buildInput(project.cwd, prompt ?? `Use ${skillName} for this project.`, skillName);
+      const input = await this.buildInput(
+        project.cwd,
+        prompt ?? `Use ${skillName} for this project.`,
+        skillName,
+      );
       const turn = await this.appServer.startTurn(thread.id, input);
       return this.tasks.beginTurn(task.id, turn.id);
     } catch (error) {
-      this.tasks.transition(task.id, "failed", error instanceof Error ? error.message : "Skill failed");
+      this.tasks.transition(
+        task.id,
+        "failed",
+        error instanceof Error ? error.message : "Skill failed",
+      );
       throw error;
     }
   }
@@ -93,7 +128,12 @@ export class WorkflowRunner {
   async followup(taskId: string, prompt: string): Promise<ManagedTask> {
     const task = this.tasks.require(taskId);
     const input = [textInput(prompt)];
-    if (["starting", "running", "waiting_approval", "waiting_input"].includes(task.status) && task.turnId) {
+    if (
+      ["starting", "running", "waiting_approval", "waiting_input"].includes(
+        task.status,
+      ) &&
+      task.turnId
+    ) {
       await this.appServer.steerTurn(task.threadId, task.turnId, input);
       return this.tasks.updateSummary(task.id, "Follow-up sent");
     }
@@ -103,17 +143,32 @@ export class WorkflowRunner {
 
   async stop(taskId: string): Promise<ManagedTask> {
     const task = this.tasks.require(taskId);
-    if (!task.turnId || !["starting", "running", "waiting_approval", "waiting_input"].includes(task.status)) {
+    if (
+      !task.turnId ||
+      !["starting", "running", "waiting_approval", "waiting_input"].includes(
+        task.status,
+      )
+    ) {
       throw new Error("Task is not running");
     }
     await this.appServer.interruptTurn(task.threadId, task.turnId);
     return this.tasks.transition(task.id, "cancelled", "Task cancelled");
   }
 
-  private async buildInput(cwd: string, prompt: string, skillName?: string): Promise<AppServerUserInput[]> {
+  private async buildInput(
+    cwd: string,
+    prompt: string,
+    skillName?: string,
+  ): Promise<AppServerUserInput[]> {
     if (!skillName) return [textInput(prompt)];
-    const skill = (await this.appServer.listSkills(cwd)).find((candidate) => candidate.name === skillName);
-    if (!skill) throw new Error(`Skill is not available for project: ${skillName}`);
-    return [{ type: "skill", name: skill.name, path: skill.path }, textInput(prompt)];
+    const skill = (await this.appServer.listSkills(cwd)).find(
+      (candidate) => candidate.name === skillName,
+    );
+    if (!skill)
+      throw new Error(`Skill is not available for project: ${skillName}`);
+    return [
+      { type: "skill", name: skill.name, path: skill.path },
+      textInput(prompt),
+    ];
   }
 }

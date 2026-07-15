@@ -18,7 +18,10 @@ export class RequestCache {
   set(requestId: string, messages: ServerMessage[], now = Date.now()): void {
     this.prune(now);
     this.entries.delete(requestId);
-    this.entries.set(requestId, { createdAt: now, messages: structuredClone(messages) });
+    this.entries.set(requestId, {
+      createdAt: now,
+      messages: structuredClone(messages),
+    });
     while (this.entries.size > REQUEST_CACHE_SIZE) {
       const oldest = this.entries.keys().next().value as string | undefined;
       if (!oldest) break;
@@ -28,7 +31,8 @@ export class RequestCache {
 
   private prune(now: number): void {
     for (const [requestId, entry] of this.entries) {
-      if (now - entry.createdAt > REQUEST_CACHE_TTL_MS) this.entries.delete(requestId);
+      if (now - entry.createdAt > REQUEST_CACHE_TTL_MS)
+        this.entries.delete(requestId);
     }
   }
 }

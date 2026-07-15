@@ -16,7 +16,11 @@ interface AppServerProcess {
   stdin: Writable;
   stdout: Readable;
   stderr: Readable;
-  once(event: "exit", listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
+  once(
+    event: "exit",
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
+  ): this;
+  on(event: "error", listener: (error: Error) => void): this;
   kill(signal?: NodeJS.Signals): boolean;
 }
 
@@ -33,6 +37,8 @@ export class AppServerClient extends EventEmitter {
   private process: AppServerProcess | undefined;
   private transport: JsonlRpcTransport | undefined;
   private stopping = false;
+  private initialized = false;
+  private everReady = false;
   private restartAttempt = 0;
   private restartTimer: NodeJS.Timeout | undefined;
 
@@ -41,7 +47,7 @@ export class AppServerClient extends EventEmitter {
   }
 
   get ready(): boolean {
-    return this.transport !== undefined;
+    return this.initialized && this.transport !== undefined;
   }
 
   async start(): Promise<void> {
@@ -54,9 +60,17 @@ export class AppServerClient extends EventEmitter {
     transport.on("notification", (notification: AppServerNotification) =>
       this.emit("notification", notification),
     );
-    transport.on("request", (request: AppServerServerRequest) => this.emit("request", request));
+    transport.on("request", (request: AppServerServerRequest) =>
+      this.emit("request", request),
+    );
     transport.on("malformed", (line: string) => this.emit("malformed", line));
-    process.stderr.on("data", (chunk: Buffer | string) => this.emit("stderr", chunk.toString()));
+    process.stderr.on("data", (chunk: Buffer | string) =>
+      this.emit("stderr", chunk.toString()),
+    );
+    process.on("error", (error) => {
+      transport.close(error);
+      this.emit("spawnError", error);
+    });
     process.once("exit", (code, signal) => this.handleExit(code, signal));
 
     try {
@@ -68,9 +82,15 @@ export class AppServerClient extends EventEmitter {
         },
       });
       transport.notify("initialized", {});
+      this.initialized = true;
+      this.everReady = true;
       this.restartAttempt = 0;
       this.emit("ready");
     } catch (error) {
+      transport.close(
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      this.initialized = false;
       this.transport = undefined;
       process.kill("SIGTERM");
       throw error;
@@ -82,6 +102,7 @@ export class AppServerClient extends EventEmitter {
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = undefined;
     this.transport?.close(new Error("App Server stopped"));
+    this.initialized = false;
     this.transport = undefined;
     this.process?.kill("SIGTERM");
     this.process = undefined;
@@ -93,21 +114,37 @@ export class AppServerClient extends EventEmitter {
     approvalPolicy?: "untrusted" | "on-request" | "never";
     sandbox?: "read-only" | "workspace-write" | "danger-full-access";
   }): Promise<AppServerThread> {
-    const response = await this.rpc<{ thread: AppServerThread }>("thread/start", params);
+    const response = await this.rpc<{ thread: AppServerThread }>(
+      "thread/start",
+      params,
+    );
     return response.thread;
   }
 
   async resumeThread(threadId: string): Promise<AppServerThread> {
-    const response = await this.rpc<{ thread: AppServerThread }>("thread/resume", { threadId });
+    const response = await this.rpc<{ thread: AppServerThread }>(
+      "thread/resume",
+      { threadId },
+    );
     return response.thread;
   }
 
-  async startTurn(threadId: string, input: AppServerUserInput[]): Promise<AppServerTurn> {
-    const response = await this.rpc<{ turn: AppServerTurn }>("turn/start", { threadId, input });
+  async startTurn(
+    threadId: string,
+    input: AppServerUserInput[],
+  ): Promise<AppServerTurn> {
+    const response = await this.rpc<{ turn: AppServerTurn }>("turn/start", {
+      threadId,
+      input,
+    });
     return response.turn;
   }
 
-  async steerTurn(threadId: string, expectedTurnId: string, input: AppServerUserInput[]): Promise<void> {
+  async steerTurn(
+    threadId: string,
+    expectedTurnId: string,
+    input: AppServerUserInput[],
+  ): Promise<void> {
     await this.rpc("turn/steer", { threadId, expectedTurnId, input });
   }
 
@@ -119,31 +156,40 @@ export class AppServerClient extends EventEmitter {
     const response = await this.rpc<{
       data: Array<{ skills: SkillMetadata[] }>;
     }>("skills/list", { cwds: [cwd], forceReload: false });
-    return response.data.flatMap((entry) => entry.skills).filter((skill) => skill.enabled);
+    return response.data
+      .flatMap((entry) => entry.skills)
+      .filter((skill) => skill.enabled);
   }
 
   private rpc<T = unknown>(method: string, params: unknown): Promise<T> {
-    if (!this.transport) return Promise.reject(new Error("Codex App Server is not ready"));
+    if (!this.transport)
+      return Promise.reject(new Error("Codex App Server is not ready"));
     return this.transport.request<T>(method, params);
   }
 
   private readonly defaultSpawn = (): AppServerProcess =>
-    spawn(this.options.codexPath ?? "codex", ["app-server", "--listen", "stdio://"], {
-      stdio: ["pipe", "pipe", "pipe"],
-      env: process.env,
-    });
+    spawn(
+      this.options.codexPath ?? "codex",
+      ["app-server", "--listen", "stdio://"],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: process.env,
+      },
+    );
 
   private handleExit(code: number | null, signal: NodeJS.Signals | null): void {
-    this.transport?.close(new Error(`App Server exited (${String(code ?? signal)})`));
+    this.transport?.close(
+      new Error(`App Server exited (${String(code ?? signal)})`),
+    );
+    this.initialized = false;
     this.transport = undefined;
     this.process = undefined;
     this.emit("exit", { code, signal });
-    if (this.stopping || !this.options.autoRestart) return;
+    if (this.stopping || !this.options.autoRestart || !this.everReady) return;
     const delay = Math.min(30_000, 500 * 2 ** this.restartAttempt++);
     this.restartTimer = setTimeout(() => {
       void this.start().catch((error: unknown) => {
         this.emit("restartError", error);
-        this.handleExit(null, null);
       });
     }, delay);
     this.restartTimer.unref();

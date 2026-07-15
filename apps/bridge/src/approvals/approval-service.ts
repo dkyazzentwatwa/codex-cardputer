@@ -15,7 +15,9 @@ interface PendingApproval {
 }
 
 function record(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return value !== null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 export class ApprovalService extends EventEmitter {
@@ -27,34 +29,62 @@ export class ApprovalService extends EventEmitter {
 
   open(request: AppServerServerRequest): ApprovalRequest | undefined {
     const params = record(request.params);
-    const threadId = typeof params.threadId === "string" ? params.threadId : undefined;
+    const threadId =
+      typeof params.threadId === "string" ? params.threadId : undefined;
     const task = threadId ? this.tasks.byThread(threadId) : undefined;
     if (!task) {
-      request.reject(-32602, "Approval does not belong to a bridge-managed task");
+      request.reject(
+        -32602,
+        "Approval does not belong to a bridge-managed task",
+      );
       return undefined;
     }
-    const command = typeof params.command === "string" ? params.command : undefined;
+    const command =
+      typeof params.command === "string" ? params.command : undefined;
     const cwd = typeof params.cwd === "string" ? params.cwd : undefined;
-    const reason = typeof params.reason === "string" ? params.reason : undefined;
-    const type = request.method.includes("commandExecution")
-      ? "command"
-      : request.method.includes("fileChange")
-        ? "file_change"
-        : request.method.includes("permissions")
-          ? "permissions"
-          : "network";
+    const reason =
+      typeof params.reason === "string" ? params.reason : undefined;
+    const grantRoot =
+      typeof params.grantRoot === "string" ? params.grantRoot : undefined;
+    const permissions = params.permissions;
+    const type = params.networkApprovalContext
+      ? "network"
+      : request.method.includes("commandExecution")
+        ? "command"
+        : request.method.includes("fileChange")
+          ? "file_change"
+          : request.method.includes("permissions")
+            ? "permissions"
+            : "network";
     const risk = classifyRisk({
       ...(command ? { command } : {}),
       ...(cwd ? { cwd } : {}),
       ...(reason ? { reason } : {}),
+      ...(grantRoot ? { targetPath: grantRoot } : {}),
+      ...(permissions ? { permissions } : {}),
     });
-    const id = typeof params.approvalId === "string" ? params.approvalId : randomUUID();
-    const summary = sanitizeSummary(reason ?? command ?? `${type.replace("_", " ")} approval requested`, 160, cwd);
+    const id =
+      typeof params.approvalId === "string" ? params.approvalId : randomUUID();
+    const summary = sanitizeSummary(
+      reason ??
+        command ??
+        grantRoot ??
+        `${type.replace("_", " ")} approval requested`,
+      160,
+      cwd,
+    );
     const approval: ApprovalRequest = {
       id,
       taskId: task.id,
       type,
-      title: type === "file_change" ? "File change approval" : "Command approval",
+      title:
+        type === "file_change"
+          ? "File change approval"
+          : type === "permissions"
+            ? "Permissions approval"
+            : type === "network"
+              ? "Network approval"
+              : "Command approval",
       summary,
       ...(command ? { command: sanitizeSummary(command, 512, cwd) } : {}),
       ...(cwd ? { cwd: path.basename(cwd) } : {}),
@@ -76,12 +106,17 @@ export class ApprovalService extends EventEmitter {
   respond(approvalId: string, decision: ApprovalDecision): ApprovalRequest {
     const pending = this.pending.get(approvalId);
     if (!pending) throw new Error(`Approval not found: ${approvalId}`);
-    if (!pending.approval.allowedDecisions.includes(decision)) throw new Error(`Decision not allowed: ${decision}`);
+    if (!pending.approval.allowedDecisions.includes(decision))
+      throw new Error(`Decision not allowed: ${decision}`);
     pending.request.respond({ decision });
     this.pending.delete(approvalId);
     const task = this.tasks.require(pending.approval.taskId);
     if (task.status === "waiting_approval") {
-      this.tasks.transition(task.id, "running", decision === "accept" ? "Approval accepted" : "Approval declined");
+      this.tasks.transition(
+        task.id,
+        "running",
+        decision === "accept" ? "Approval accepted" : "Approval declined",
+      );
     }
     this.emit("resolved", { approvalId, decision });
     return pending.approval;

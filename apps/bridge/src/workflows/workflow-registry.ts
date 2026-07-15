@@ -21,8 +21,12 @@ const projectSchema = z
     label: z.string().trim().min(1).max(48),
     cwd: z.string().min(1),
     model: z.string().trim().min(1).max(80).optional(),
-    approvalPolicy: z.enum(["untrusted", "on-request", "never"]).default("on-request"),
-    sandbox: z.enum(["read-only", "workspace-write", "danger-full-access"]).default("workspace-write"),
+    approvalPolicy: z
+      .enum(["untrusted", "on-request", "never"])
+      .default("on-request"),
+    sandbox: z
+      .enum(["read-only", "workspace-write", "danger-full-access"])
+      .default("workspace-write"),
     workflows: z.record(z.string().regex(IDENTIFIER), workflowSchema),
   })
   .strict();
@@ -38,12 +42,16 @@ export class WorkflowRegistry {
   private projects = new Map<string, ProjectDefinition>();
 
   async load(filePath: string): Promise<void> {
-    const document = parseDocument(await readFile(filePath, "utf8"), { uniqueKeys: true });
-    if (document.errors.length > 0) throw new Error(document.errors.map((error) => error.message).join("; "));
+    const document = parseDocument(await readFile(filePath, "utf8"), {
+      uniqueKeys: true,
+    });
+    if (document.errors.length > 0)
+      throw new Error(document.errors.map((error) => error.message).join("; "));
     const parsed = registrySchema.parse(document.toJS());
     const next = new Map<string, ProjectDefinition>();
     for (const [id, project] of Object.entries(parsed.projects)) {
-      if (!path.isAbsolute(project.cwd)) throw new Error(`Project ${id} cwd must be absolute`);
+      if (!path.isAbsolute(project.cwd))
+        throw new Error(`Project ${id} cwd must be absolute`);
       await access(project.cwd);
       next.set(id, { id, ...project });
     }
@@ -58,7 +66,8 @@ export class WorkflowRegistry {
 
   getWorkflow(projectId: string, workflowId: string): WorkflowDefinition {
     const workflow = this.getProject(projectId).workflows[workflowId];
-    if (!workflow) throw new Error(`Unknown workflow: ${projectId}/${workflowId}`);
+    if (!workflow)
+      throw new Error(`Unknown workflow: ${projectId}/${workflowId}`);
     return workflow;
   }
 

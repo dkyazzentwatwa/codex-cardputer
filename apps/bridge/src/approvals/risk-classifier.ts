@@ -4,20 +4,66 @@ export interface RiskResult {
 }
 
 const HIGH_RISK: Array<[RegExp, string]> = [
-  [/\brm\s+(?:-[^\s]*r[^\s]*f|-[^\s]*f[^\s]*r)\b|\bfind\b.*\s-delete\b/i, "Recursive deletion"],
+  [
+    /\brm\s+(?:-[^\s]*r[^\s]*f|-[^\s]*f[^\s]*r)\b|\bfind\b.*\s-delete\b/i,
+    "Recursive deletion",
+  ],
   [/\bsudo\b|\bdoas\b/i, "Privilege elevation"],
-  [/\bgit\s+(?:push\s+.*--force|reset\s+--hard|clean\s+-[^\s]*f)/i, "Destructive Git operation"],
-  [/\b(?:security|keychain|ssh-add|passwd)\b/i, "Credential or secret-store modification"],
+  [
+    /\bgit\s+(?:push\s+.*--force|reset\s+--hard|clean\s+-[^\s]*f)/i,
+    "Destructive Git operation",
+  ],
+  [
+    /\b(?:security|keychain|ssh-add|passwd)\b/i,
+    "Credential or secret-store modification",
+  ],
   [/\b(?:diskutil|mkfs|shutdown|reboot)\b/i, "Disk or system power operation"],
-  [/\b(?:pfctl|iptables|route|networksetup|systemctl)\b/i, "System network or service change"],
-  [/\b(?:npm|pnpm|yarn)\s+(?:publish|login)\b/i, "Package publication or login"],
+  [
+    /\b(?:pfctl|iptables|route|networksetup|systemctl)\b/i,
+    "System network or service change",
+  ],
+  [
+    /\b(?:npm|pnpm|yarn)\s+(?:publish|login)\b/i,
+    "Package publication or login",
+  ],
+  [
+    /\b(?:curl|wget)\b[^|]*(?:\||&&)\s*(?:sh|bash|zsh)\b/i,
+    "Remote code execution",
+  ],
 ];
 
-export function classifyRisk(input: { command?: string; cwd?: string; reason?: string }): RiskResult {
-  const combined = [input.command, input.cwd, input.reason].filter(Boolean).join(" ");
+export function classifyRisk(input: {
+  command?: string;
+  cwd?: string;
+  reason?: string;
+  targetPath?: string;
+  permissions?: unknown;
+}): RiskResult {
+  const permissions = input.permissions
+    ? JSON.stringify(input.permissions)
+    : "";
+  if (
+    input.targetPath === "/" ||
+    /^\/Users\/[^/]+\/?$/.test(input.targetPath ?? "")
+  )
+    return { risk: "high", reason: "Broad filesystem access" };
+  if (/"network"\s*:\s*\{[^}]*"enabled"\s*:\s*true/i.test(permissions))
+    return { risk: "high", reason: "Broad network permission" };
+  if (/"(?:write|path)"\s*:\s*(?:"\/"|\[\s*"\/"\s*\])/i.test(permissions))
+    return { risk: "high", reason: "Broad filesystem access" };
+  const combined = [
+    input.command,
+    input.cwd,
+    input.reason,
+    input.targetPath,
+    permissions,
+  ]
+    .filter(Boolean)
+    .join(" ");
   for (const [pattern, reason] of HIGH_RISK) {
     if (pattern.test(combined)) return { risk: "high", reason };
   }
-  if (/\b(?:curl|wget|ssh|scp)\b/i.test(combined)) return { risk: "medium", reason: "Network access" };
+  if (/\b(?:curl|wget|ssh|scp)\b/i.test(combined))
+    return { risk: "medium", reason: "Network access" };
   return { risk: "low" };
 }

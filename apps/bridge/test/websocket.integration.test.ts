@@ -17,10 +17,16 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.stop()));
 });
 
-async function waitFor(messages: Array<Record<string, unknown>>, predicate: () => boolean): Promise<void> {
+async function waitFor(
+  messages: Array<Record<string, unknown>>,
+  predicate: () => boolean,
+): Promise<void> {
   const started = Date.now();
   while (!predicate()) {
-    if (Date.now() - started > 2000) throw new Error(`Timed out waiting for messages: ${JSON.stringify(messages)}`);
+    if (Date.now() - started > 2000)
+      throw new Error(
+        `Timed out waiting for messages: ${JSON.stringify(messages)}`,
+      );
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
@@ -51,7 +57,13 @@ describe("device WebSocket", () => {
       },
       approvals,
     );
-    const server = new ControlDeckServer("0.1.0", tasks, approvals, router, () => true);
+    const server = new ControlDeckServer(
+      "0.1.0",
+      tasks,
+      approvals,
+      router,
+      () => true,
+    );
     servers.push(server);
     await server.start("127.0.0.1", 0, false);
     const address = server.address();
@@ -59,7 +71,9 @@ describe("device WebSocket", () => {
     const port = Number(address?.split(":").at(-1));
     const socket = new WebSocket(`ws://127.0.0.1:${port}/device`);
     const messages: Array<Record<string, unknown>> = [];
-    socket.on("message", (data) => messages.push(JSON.parse(data.toString()) as Record<string, unknown>));
+    socket.on("message", (data) =>
+      messages.push(JSON.parse(data.toString()) as Record<string, unknown>),
+    );
     await new Promise<void>((resolve, reject) => {
       socket.once("open", () => resolve());
       socket.once("error", reject);
@@ -74,13 +88,95 @@ describe("device WebSocket", () => {
         capabilities: ["keyboard", "display", "hold-confirm"],
       }),
     );
-    await waitFor(messages, () => messages.some((message) => message.type === "macro.snapshot"));
+    await waitFor(messages, () =>
+      messages.some((message) => message.type === "macro.snapshot"),
+    );
     expect(messages.map((message) => message.type)).toEqual(
       expect.arrayContaining(["welcome", "task.snapshot", "macro.snapshot"]),
     );
 
+    const second = new WebSocket(`ws://127.0.0.1:${port}/device`);
+    const secondMessages: Array<Record<string, unknown>> = [];
+    second.on("message", (data) =>
+      secondMessages.push(
+        JSON.parse(data.toString()) as Record<string, unknown>,
+      ),
+    );
+    await new Promise<void>((resolve, reject) => {
+      second.once("open", () => resolve());
+      second.once("error", reject);
+    });
+    second.send(
+      JSON.stringify({
+        type: "hello",
+        protocol: "codexdeck.v1",
+        deviceId: "cardputer-second",
+        deviceName: "CardPuter 2",
+        firmwareVersion: "0.1.0",
+        capabilities: ["keyboard", "display", "hold-confirm"],
+      }),
+    );
+    await waitFor(secondMessages, () =>
+      secondMessages.some((message) => message.type === "task.snapshot"),
+    );
+    const now = new Date().toISOString();
+    tasks.create({
+      id: "task-live",
+      threadId: "thread-live",
+      turnId: "turn-live",
+      projectId: "demo",
+      title: "Live task",
+      status: "running",
+      summary: "Working",
+      startedAt: now,
+      updatedAt: now,
+    });
+    const receivedLiveTask = (items: Array<Record<string, unknown>>) =>
+      items.some(
+        (message) =>
+          message.type === "task.upsert" &&
+          (message.task as { id?: string } | undefined)?.id === "task-live",
+      );
+    await waitFor(messages, () => receivedLiveTask(messages));
+    await waitFor(secondMessages, () => receivedLiveTask(secondMessages));
+    await new Promise<void>((resolve) => {
+      second.once("close", () => resolve());
+      second.close();
+    });
+
+    const reconnected = new WebSocket(`ws://127.0.0.1:${port}/device`);
+    const reconnectMessages: Array<Record<string, unknown>> = [];
+    reconnected.on("message", (data) =>
+      reconnectMessages.push(
+        JSON.parse(data.toString()) as Record<string, unknown>,
+      ),
+    );
+    await new Promise<void>((resolve, reject) => {
+      reconnected.once("open", () => resolve());
+      reconnected.once("error", reject);
+    });
+    reconnected.send(
+      JSON.stringify({
+        type: "hello",
+        protocol: "codexdeck.v1",
+        deviceId: "cardputer-second",
+        deviceName: "CardPuter 2",
+        firmwareVersion: "0.1.0",
+        capabilities: ["keyboard", "display", "hold-confirm"],
+      }),
+    );
+    await waitFor(reconnectMessages, () =>
+      reconnectMessages.some((message) => {
+        if (message.type !== "task.snapshot") return false;
+        const snapshot = message.tasks as Array<{ id?: string }> | undefined;
+        return snapshot?.some((task) => task.id === "task-live") ?? false;
+      }),
+    );
+
     socket.send("{");
-    await waitFor(messages, () => messages.some((message) => message.type === "error"));
+    await waitFor(messages, () =>
+      messages.some((message) => message.type === "error"),
+    );
     expect(socket.readyState).toBe(WebSocket.OPEN);
 
     const request = {
@@ -90,13 +186,26 @@ describe("device WebSocket", () => {
       workflowId: "review",
     };
     socket.send(JSON.stringify(request));
-    await waitFor(messages, () => messages.filter((message) => message.requestId === "req-1").length === 1);
+    await waitFor(
+      messages,
+      () =>
+        messages.filter((message) => message.requestId === "req-1").length ===
+        1,
+    );
     socket.send(JSON.stringify(request));
-    await waitFor(messages, () => messages.filter((message) => message.requestId === "req-1").length === 2);
+    await waitFor(
+      messages,
+      () =>
+        messages.filter((message) => message.requestId === "req-1").length ===
+        2,
+    );
     expect(launchWorkflow).toHaveBeenCalledTimes(1);
 
-    const health = await fetch(`http://127.0.0.1:${port}/healthz`).then((response) => response.json());
-    expect(health).toMatchObject({ status: "ok", connectedDevices: 1 });
+    const health = await fetch(`http://127.0.0.1:${port}/healthz`).then(
+      (response) => response.json(),
+    );
+    expect(health).toMatchObject({ status: "ok", connectedDevices: 2 });
+    reconnected.close();
     socket.close();
   });
 });

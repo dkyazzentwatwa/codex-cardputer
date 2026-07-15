@@ -23,7 +23,10 @@ export interface BridgeHealth {
 
 export class ControlDeckServer extends EventEmitter {
   private readonly app = Fastify({ logger: false });
-  private readonly sockets = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME_BYTES });
+  private readonly sockets = new WebSocketServer({
+    noServer: true,
+    maxPayload: MAX_FRAME_BYTES,
+  });
   private readonly sessions = new Set<DeviceSession>();
   private readonly mdns = new MdnsAdvertiser();
   private readonly startedAt = Date.now();
@@ -33,7 +36,7 @@ export class ControlDeckServer extends EventEmitter {
     private readonly bridgeVersion: string,
     private readonly tasks: TaskRegistry,
     approvals: ApprovalService,
-    router: MessageRouter,
+    private readonly router: MessageRouter,
     private readonly codexReady: () => boolean,
   ) {
     super();
@@ -44,18 +47,35 @@ export class ControlDeckServer extends EventEmitter {
         socket.destroy();
         return;
       }
-      this.sockets.handleUpgrade(request, socket, head, (webSocket) => this.sockets.emit("connection", webSocket));
+      this.sockets.handleUpgrade(request, socket, head, (webSocket) =>
+        this.sockets.emit("connection", webSocket),
+      );
     });
     this.sockets.on("connection", (socket) => {
-      const session = new DeviceSession(socket, bridgeVersion, tasks, approvals, router, () => {
-        this.sessions.delete(session);
-      });
+      const session = new DeviceSession(
+        socket,
+        bridgeVersion,
+        tasks,
+        approvals,
+        router,
+        () => {
+          this.sessions.delete(session);
+        },
+      );
       this.sessions.add(session);
     });
-    tasks.on("upsert", (task: ManagedTask) => this.broadcast({ type: "task.upsert", task }));
-    approvals.on("open", (approval: ApprovalRequest) => this.broadcast({ type: "approval.open", approval }));
-    approvals.on("resolved", (result: { approvalId: string; decision: "accept" | "decline" | "cancel" }) =>
-      this.broadcast({ type: "approval.resolved", ...result }),
+    tasks.on("upsert", (task: ManagedTask) =>
+      this.broadcast({ type: "task.upsert", task }),
+    );
+    approvals.on("open", (approval: ApprovalRequest) =>
+      this.broadcast({ type: "approval.open", approval }),
+    );
+    approvals.on(
+      "resolved",
+      (result: {
+        approvalId: string;
+        decision: "accept" | "decline" | "cancel";
+      }) => this.broadcast({ type: "approval.resolved", ...result }),
     );
   }
 
@@ -63,7 +83,8 @@ export class ControlDeckServer extends EventEmitter {
     await this.app.listen({ host, port });
     this.listening = true;
     const address = this.app.server.address();
-    const actualPort = typeof address === "object" && address ? address.port : port;
+    const actualPort =
+      typeof address === "object" && address ? address.port : port;
     if (advertise) this.mdns.start(actualPort, host, this.bridgeVersion);
     this.emit("listening", { host, port: actualPort });
   }
@@ -81,14 +102,24 @@ export class ControlDeckServer extends EventEmitter {
   address(): string | null {
     const address = this.app.server.address();
     if (!address) return null;
-    return typeof address === "string" ? address : `${address.address}:${address.port}`;
+    return typeof address === "string"
+      ? address
+      : `${address.address}:${address.port}`;
   }
 
   health(): BridgeHealth {
     const codexReady = this.codexReady();
     const activeTasks = this.tasks
       .all()
-      .filter((task) => ["starting", "running", "waiting_approval", "waiting_input", "stale"].includes(task.status)).length;
+      .filter((task) =>
+        [
+          "starting",
+          "running",
+          "waiting_approval",
+          "waiting_input",
+          "stale",
+        ].includes(task.status),
+      ).length;
     return {
       status: codexReady ? "ok" : "degraded",
       bridgeVersion: this.bridgeVersion,
@@ -97,6 +128,13 @@ export class ControlDeckServer extends EventEmitter {
       activeTasks,
       uptimeSeconds: Math.floor((Date.now() - this.startedAt) / 1000),
     };
+  }
+
+  broadcastMacros(): void {
+    this.broadcast({
+      type: "macro.snapshot",
+      macros: this.router.macroSnapshot(),
+    });
   }
 
   private broadcast(message: ServerMessage): void {

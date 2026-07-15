@@ -65,20 +65,28 @@ describe("codexdeck.v1 schemas", () => {
   });
 
   it("rejects unknown fields", () => {
-    expect(deviceMessageSchema.safeParse({ ...hello, token: "secret" }).success).toBe(false);
+    expect(
+      deviceMessageSchema.safeParse({ ...hello, token: "secret" }).success,
+    ).toBe(false);
   });
 
   it("rejects protocol mismatches", () => {
-    expect(deviceMessageSchema.safeParse({ ...hello, protocol: "codexdeck.v2" }).success).toBe(false);
+    expect(
+      deviceMessageSchema.safeParse({ ...hello, protocol: "codexdeck.v2" })
+        .success,
+    ).toBe(false);
   });
 
   it("enforces the maximum frame size", () => {
-    expect(() => parseDeviceFrame(Buffer.alloc(MAX_FRAME_BYTES + 1, "x"))).toThrowError(ProtocolError);
+    expect(() =>
+      parseDeviceFrame(Buffer.alloc(MAX_FRAME_BYTES + 1, "x")),
+    ).toThrowError(ProtocolError);
   });
 
   it("rejects malformed JSON without exposing parser details", () => {
-    expect(() => parseDeviceFrame("{"))
-      .toThrowError(expect.objectContaining({ code: "MALFORMED_JSON" }));
+    expect(() => parseDeviceFrame("{")).toThrowError(
+      expect.objectContaining({ code: "MALFORMED_JSON" }),
+    );
   });
 
   it("enforces the 240-byte follow-up limit", () => {

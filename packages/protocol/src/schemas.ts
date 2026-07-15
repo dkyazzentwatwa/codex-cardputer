@@ -96,7 +96,9 @@ export const helloMessageSchema = z
     deviceId: idSchema,
     deviceName: z.string().trim().min(1).max(32),
     firmwareVersion: z.string().trim().min(1).max(24),
-    capabilities: z.array(z.enum(["keyboard", "display", "hold-confirm"])).max(8),
+    capabilities: z
+      .array(z.enum(["keyboard", "display", "hold-confirm"]))
+      .max(8),
   })
   .strict();
 
@@ -105,7 +107,11 @@ export const deviceMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("pong"), nonce: idSchema }).strict(),
   z.object({ type: z.literal("task.select"), taskId: taskIdSchema }).strict(),
   z
-    .object({ type: z.literal("task.stop.request"), requestId: requestIdSchema, taskId: taskIdSchema })
+    .object({
+      type: z.literal("task.stop.request"),
+      requestId: requestIdSchema,
+      taskId: taskIdSchema,
+    })
     .strict(),
   z
     .object({
@@ -116,9 +122,12 @@ export const deviceMessageSchema = z.discriminatedUnion("type", [
         .string()
         .trim()
         .min(1)
-        .refine((value) => Buffer.byteLength(value, "utf8") <= MAX_FOLLOWUP_BYTES, {
-          message: `Follow-up exceeds ${MAX_FOLLOWUP_BYTES} UTF-8 bytes`,
-        }),
+        .refine(
+          (value) => Buffer.byteLength(value, "utf8") <= MAX_FOLLOWUP_BYTES,
+          {
+            message: `Follow-up exceeds ${MAX_FOLLOWUP_BYTES} UTF-8 bytes`,
+          },
+        ),
     })
     .strict(),
   z
@@ -160,11 +169,21 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z
-    .object({ type: z.literal("task.snapshot"), tasks: z.array(taskSummarySchema).max(MAX_SNAPSHOT_TASKS) })
+    .object({
+      type: z.literal("task.snapshot"),
+      tasks: z.array(taskSummarySchema).max(MAX_SNAPSHOT_TASKS),
+    })
     .strict(),
-  z.object({ type: z.literal("task.upsert"), task: taskSummarySchema }).strict(),
+  z
+    .object({ type: z.literal("task.upsert"), task: taskSummarySchema })
+    .strict(),
   z.object({ type: z.literal("task.remove"), taskId: taskIdSchema }).strict(),
-  z.object({ type: z.literal("approval.open"), approval: approvalRequestSchema }).strict(),
+  z
+    .object({
+      type: z.literal("approval.open"),
+      approval: approvalRequestSchema,
+    })
+    .strict(),
   z
     .object({
       type: z.literal("approval.resolved"),
@@ -172,7 +191,12 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
       decision: approvalDecisionSchema.optional(),
     })
     .strict(),
-  z.object({ type: z.literal("macro.snapshot"), macros: z.array(macroDescriptorSchema).max(20) }).strict(),
+  z
+    .object({
+      type: z.literal("macro.snapshot"),
+      macros: z.array(macroDescriptorSchema).max(20),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("toast"),

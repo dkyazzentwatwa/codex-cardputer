@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { commandCategory, sanitizeSummary } from "../src/tasks/summary-builder.js";
+import {
+  commandCategory,
+  sanitizeSummary,
+} from "../src/tasks/summary-builder.js";
 
 describe("summary builder", () => {
   it("strips ANSI, secrets, controls, and long paths", () => {
@@ -14,7 +17,9 @@ describe("summary builder", () => {
   });
 
   it("truncates at a readable boundary", () => {
-    expect(sanitizeSummary("one two three four five", 14)).toBe("one two three…");
+    expect(sanitizeSummary("one two three four five", 14)).toBe(
+      "one two three…",
+    );
   });
 
   it("categorizes commands without exposing output", () => {

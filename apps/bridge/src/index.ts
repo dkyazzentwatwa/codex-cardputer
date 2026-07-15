@@ -4,7 +4,10 @@ import { pathToFileURL } from "node:url";
 import { ApprovalService } from "./approvals/approval-service.js";
 import { AppServerClient } from "./codex/app-server-client.js";
 import { EventNormalizer } from "./codex/event-normalizer.js";
-import type { AppServerNotification, AppServerServerRequest } from "./codex/types.js";
+import type {
+  AppServerNotification,
+  AppServerServerRequest,
+} from "./codex/types.js";
 import { loadConfig } from "./config.js";
 import { DesktopInputService } from "./desktop-input-service.js";
 import { selectBindHost } from "./network/private-address.js";
@@ -14,16 +17,37 @@ import { ControlDeckServer } from "./server.js";
 import { TaskRegistry } from "./tasks/task-registry.js";
 import { WorkflowRegistry } from "./workflows/workflow-registry.js";
 import { WorkflowRunner } from "./workflows/workflow-runner.js";
+import { discoverSkillMacros } from "./workflows/skill-macros.js";
 
 export const BRIDGE_VERSION = "0.1.0" as const;
 export const TESTED_CODEX_VERSION = "0.140.0" as const;
+let prettyLogs = false;
 
-function log(level: "info" | "warn" | "error", component: string, event: string, fields = {}): void {
-  process.stdout.write(`${JSON.stringify({ timestamp: new Date().toISOString(), level, component, event, ...fields })}\n`);
+function log(
+  level: "info" | "warn" | "error",
+  component: string,
+  event: string,
+  fields = {},
+): void {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    level,
+    component,
+    event,
+    ...fields,
+  };
+  process.stdout.write(
+    prettyLogs
+      ? `[${entry.timestamp}] ${level.toUpperCase()} ${component}.${event} ${JSON.stringify(fields)}\n`
+      : `${JSON.stringify(entry)}\n`,
+  );
 }
 
-export async function runBridge(configPath: string): Promise<() => Promise<void>> {
+export async function runBridge(
+  configPath: string,
+): Promise<() => Promise<void>> {
   const config = await loadConfig(configPath);
+  prettyLogs = config.prettyLogs;
   const workflows = new WorkflowRegistry();
   await workflows.load(config.workflowsFile);
   const tasks = new TaskRegistry();
@@ -42,46 +66,83 @@ export async function runBridge(configPath: string): Promise<() => Promise<void>
   const runner = new WorkflowRunner(appServer, workflows, tasks);
   const router = new MessageRouter(tasks, workflows, runner, approvals);
   const host = config.bindHost ?? selectBindHost();
-  const server = new ControlDeckServer(BRIDGE_VERSION, tasks, approvals, router, () => appServer.ready);
+  const server = new ControlDeckServer(
+    BRIDGE_VERSION,
+    tasks,
+    approvals,
+    router,
+    () => appServer.ready,
+  );
 
   let saveTimer: NodeJS.Timeout | undefined;
   tasks.on("upsert", () => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      void store.save({ version: 1, tasks: tasks.all(), display: {} }).catch((error: unknown) =>
-        log("error", "persistence", "save_failed", { error: error instanceof Error ? error.message : String(error) }),
-      );
+      void store
+        .save({ version: 1, tasks: tasks.all(), display: {} })
+        .catch((error: unknown) =>
+          log("error", "persistence", "save_failed", {
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
     }, 100);
   });
 
-  appServer.on("notification", (notification: AppServerNotification) => normalizer.handle(notification));
+  appServer.on("notification", (notification: AppServerNotification) =>
+    normalizer.handle(notification),
+  );
   appServer.on("request", (request: AppServerServerRequest) => {
-    if (request.method === "item/tool/requestUserInput") desktopInput.handle(request);
-    else if (request.method.includes("requestApproval")) approvals.open(request);
+    if (request.method === "item/tool/requestUserInput")
+      desktopInput.handle(request);
+    else if (request.method.includes("requestApproval"))
+      approvals.open(request);
     else request.reject(-32601, "Unsupported App Server request");
   });
-  appServer.on("stderr", (message: string) => log("warn", "app-server", "stderr", { message: message.trim().slice(0, 500) }));
+  appServer.on("stderr", (message: string) =>
+    log("warn", "app-server", "stderr", {
+      message: message.trim().slice(0, 500),
+    }),
+  );
   appServer.on("exit", (result: unknown) => {
     tasks.markActiveStale();
     log("warn", "app-server", "exited", { result });
   });
+  let initialStart = true;
   appServer.on("ready", () => {
-    void resumeManagedTasks(appServer, tasks);
+    if (initialStart) return;
+    void Promise.all([
+      resumeManagedTasks(appServer, tasks),
+      refreshSkillMacros(appServer, workflows, router),
+    ]).then(() => server.broadcastMacros());
   });
 
   await appServer.start();
+  initialStart = false;
+  await refreshSkillMacros(appServer, workflows, router);
+  await resumeManagedTasks(appServer, tasks);
   await server.start(host, config.port);
   log("warn", "network", "trusted_lan_only", {
-    message: "Unauthenticated device protocol. Do not expose through public listeners, tunnels, or port forwarding.",
+    message:
+      "Unauthenticated device protocol. Do not expose through public listeners, tunnels, or port forwarding.",
     host,
     port: config.port,
   });
-  log("info", "bridge", "ready", { address: server.address(), testedCodexVersion: TESTED_CODEX_VERSION });
+  log("info", "bridge", "ready", {
+    address: server.address(),
+    testedCodexVersion: TESTED_CODEX_VERSION,
+  });
 
   process.on("SIGHUP", () => {
     void workflows.load(config.workflowsFile).then(
-      () => log("info", "workflows", "reloaded"),
-      (error: unknown) => log("error", "workflows", "reload_failed", { error: error instanceof Error ? error.message : String(error) }),
+      async () => {
+        await refreshSkillMacros(appServer, workflows, router);
+        server.broadcastMacros();
+        log("info", "workflows", "reloaded");
+      },
+      (error: unknown) =>
+        log("error", "workflows", "reload_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        }),
     );
   });
 
@@ -93,21 +154,55 @@ export async function runBridge(configPath: string): Promise<() => Promise<void>
   };
 }
 
-async function resumeManagedTasks(appServer: AppServerClient, tasks: TaskRegistry): Promise<void> {
-  for (const task of tasks.all().filter((candidate) => candidate.status === "stale")) {
+async function refreshSkillMacros(
+  appServer: AppServerClient,
+  workflows: WorkflowRegistry,
+  router: MessageRouter,
+): Promise<void> {
+  const macros = await discoverSkillMacros(
+    appServer,
+    workflows,
+    (projectId, error) =>
+      log("warn", "skills", "discovery_failed", {
+        projectId,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+  );
+  router.setSkillMacros(macros);
+  log("info", "skills", "discovered", { count: macros.length });
+}
+
+async function resumeManagedTasks(
+  appServer: AppServerClient,
+  tasks: TaskRegistry,
+): Promise<void> {
+  for (const task of tasks
+    .all()
+    .filter((candidate) => candidate.status === "stale")) {
     try {
       await appServer.resumeThread(task.threadId);
       const restore = task.previousActiveStatus;
-      const status = restore && !["completed", "failed", "cancelled", "stale"].includes(restore) ? restore : "running";
+      const status =
+        restore &&
+        !["completed", "failed", "cancelled", "stale"].includes(restore)
+          ? restore
+          : "running";
       tasks.transition(task.id, status, "Codex thread resumed");
     } catch (error) {
-      tasks.transition(task.id, "failed", error instanceof Error ? error.message : "Thread resume failed");
+      tasks.transition(
+        task.id,
+        "failed",
+        error instanceof Error ? error.message : "Thread resume failed",
+      );
     }
   }
 }
 
 async function main(): Promise<void> {
-  const configPath = process.env.CODEXDECK_CONFIG ?? process.argv[2] ?? "apps/bridge/config/bridge.example.yaml";
+  const configPath =
+    process.env.CODEXDECK_CONFIG ??
+    process.argv[2] ??
+    "apps/bridge/config/bridge.example.yaml";
   const stop = await runBridge(configPath);
   const shutdown = () => {
     void stop().finally(() => process.exit(0));
@@ -116,9 +211,14 @@ async function main(): Promise<void> {
   process.once("SIGTERM", shutdown);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main().catch((error: unknown) => {
-    log("error", "bridge", "startup_failed", { error: error instanceof Error ? error.message : String(error) });
+    log("error", "bridge", "startup_failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     process.exitCode = 1;
   });
 }

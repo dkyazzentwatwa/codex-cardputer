@@ -12,13 +12,35 @@ describe("StateStore", () => {
     const file = path.join(root, "state.json");
     const store = new StateStore(file);
     await store.save({ version: 1, tasks: [], display: { brightness: 180 } });
-    await expect(store.load()).resolves.toEqual({ version: 1, tasks: [], display: { brightness: 180 } });
+    await expect(store.load()).resolves.toEqual({
+      version: 1,
+      tasks: [],
+      display: { brightness: 180 },
+    });
   });
 
   it("recovers from corrupt state", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "codexdeck-state-"));
     const file = path.join(root, "state.json");
     await writeFile(file, "not-json");
-    await expect(new StateStore(file).load()).resolves.toEqual({ version: 1, tasks: [], display: {} });
+    await expect(new StateStore(file).load()).resolves.toEqual({
+      version: 1,
+      tasks: [],
+      display: {},
+    });
+  });
+
+  it("rejects structurally invalid state without restoring it", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "codexdeck-state-"));
+    const file = path.join(root, "state.json");
+    await writeFile(
+      file,
+      JSON.stringify({ version: 1, tasks: [{ status: "root" }], display: {} }),
+    );
+    await expect(new StateStore(file).load()).resolves.toEqual({
+      version: 1,
+      tasks: [],
+      display: {},
+    });
   });
 });

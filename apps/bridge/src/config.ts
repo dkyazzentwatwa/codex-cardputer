@@ -18,18 +18,36 @@ const configSchema = z
   })
   .strict();
 
-export type BridgeConfig = z.infer<typeof configSchema> & { dataDirectory: string; stateFile: string };
+export type BridgeConfig = z.infer<typeof configSchema> & {
+  dataDirectory: string;
+  stateFile: string;
+};
 
 export function defaultDataDirectory(): string {
-  if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", "cardputer-codex-control");
+  if (process.platform === "darwin")
+    return path.join(
+      os.homedir(),
+      "Library",
+      "Application Support",
+      "cardputer-codex-control",
+    );
   if (process.platform === "win32")
-    return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), "cardputer-codex-control");
-  return path.join(process.env.XDG_STATE_HOME ?? path.join(os.homedir(), ".local", "state"), "cardputer-codex-control");
+    return path.join(
+      process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"),
+      "cardputer-codex-control",
+    );
+  return path.join(
+    process.env.XDG_STATE_HOME ?? path.join(os.homedir(), ".local", "state"),
+    "cardputer-codex-control",
+  );
 }
 
 export async function loadConfig(filePath: string): Promise<BridgeConfig> {
-  const document = parseDocument(await readFile(filePath, "utf8"), { uniqueKeys: true });
-  if (document.errors.length > 0) throw new Error(document.errors.map((error) => error.message).join("; "));
+  const document = parseDocument(await readFile(filePath, "utf8"), {
+    uniqueKeys: true,
+  });
+  if (document.errors.length > 0)
+    throw new Error(document.errors.map((error) => error.message).join("; "));
   const parsed = configSchema.parse(document.toJS());
   const dataDirectory = defaultDataDirectory();
   return {

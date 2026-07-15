@@ -15,7 +15,10 @@ export class ProtocolError extends Error {
 function decodeJson(frame: string | Buffer): unknown {
   const bytes = Buffer.byteLength(frame);
   if (bytes > MAX_FRAME_BYTES) {
-    throw new ProtocolError("FRAME_TOO_LARGE", `Frame exceeds ${MAX_FRAME_BYTES} bytes`);
+    throw new ProtocolError(
+      "FRAME_TOO_LARGE",
+      `Frame exceeds ${MAX_FRAME_BYTES} bytes`,
+    );
   }
   try {
     return JSON.parse(frame.toString()) as unknown;
@@ -27,7 +30,10 @@ function decodeJson(frame: string | Buffer): unknown {
 export function parseDeviceFrame(frame: string | Buffer): DeviceMessage {
   const result = deviceMessageSchema.safeParse(decodeJson(frame));
   if (!result.success) {
-    throw new ProtocolError("INVALID_MESSAGE", result.error.issues[0]?.message ?? "Invalid device message");
+    throw new ProtocolError(
+      "INVALID_MESSAGE",
+      result.error.issues[0]?.message ?? "Invalid device message",
+    );
   }
   return result.data;
 }
@@ -35,7 +41,10 @@ export function parseDeviceFrame(frame: string | Buffer): DeviceMessage {
 export function parseServerFrame(frame: string | Buffer): ServerMessage {
   const result = serverMessageSchema.safeParse(decodeJson(frame));
   if (!result.success) {
-    throw new ProtocolError("INVALID_MESSAGE", result.error.issues[0]?.message ?? "Invalid server message");
+    throw new ProtocolError(
+      "INVALID_MESSAGE",
+      result.error.issues[0]?.message ?? "Invalid server message",
+    );
   }
   return result.data;
 }

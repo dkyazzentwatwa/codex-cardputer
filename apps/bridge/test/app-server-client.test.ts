@@ -10,7 +10,10 @@ class FakeProcess extends EventEmitter {
   readonly stdout = new PassThrough();
   readonly stderr = new PassThrough();
 
-  override once(event: "exit", listener: (code: number | null, signal: NodeJS.Signals | null) => void): this {
+  override once(
+    event: "exit",
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
+  ): this {
     return super.once(event, listener);
   }
 
@@ -40,15 +43,59 @@ describe("AppServerClient", () => {
         process.stdout.write(`${JSON.stringify({ id: message.id, result })}\n`);
       }
     });
-    const client = new AppServerClient({ clientVersion: "0.1.0", spawnProcess: () => process });
+    const client = new AppServerClient({
+      clientVersion: "0.1.0",
+      spawnProcess: () => process,
+    });
     await client.start();
-    await expect(client.startThread({ cwd: "/tmp", approvalPolicy: "on-request" })).resolves.toEqual({
+    await expect(
+      client.startThread({ cwd: "/tmp", approvalPolicy: "on-request" }),
+    ).resolves.toEqual({
       id: "thread-1",
     });
     await expect(
-      client.startTurn("thread-1", [{ type: "text", text: "hello", text_elements: [] }]),
+      client.startTurn("thread-1", [
+        { type: "text", text: "hello", text_elements: [] },
+      ]),
     ).resolves.toEqual({ id: "turn-1" });
     expect(client.ready).toBe(true);
     client.stop();
+  });
+
+  it("rejects pending requests and clears readiness when the process exits", async () => {
+    const process = new FakeProcess();
+    process.stdin.on("data", (chunk) => {
+      for (const line of chunk.toString().trim().split("\n")) {
+        if (!line) continue;
+        const message = JSON.parse(line) as { id?: number; method: string };
+        if (message.method === "initialize" && message.id !== undefined) {
+          process.stdout.write(
+            `${JSON.stringify({ id: message.id, result: {} })}\n`,
+          );
+        }
+      }
+    });
+    const client = new AppServerClient({
+      clientVersion: "0.1.0",
+      autoRestart: false,
+      spawnProcess: () => process,
+    });
+    await client.start();
+    const pending = client.resumeThread("thread-missing");
+    process.emit("exit", 9, null);
+    await expect(pending).rejects.toThrow("App Server exited (9)");
+    expect(client.ready).toBe(false);
+  });
+
+  it("reports an unavailable Codex executable during initialization", async () => {
+    const process = new FakeProcess();
+    const client = new AppServerClient({
+      clientVersion: "0.1.0",
+      spawnProcess: () => process,
+    });
+    const starting = client.start();
+    process.emit("error", new Error("spawn codex ENOENT"));
+    await expect(starting).rejects.toThrow("spawn codex ENOENT");
+    expect(client.ready).toBe(false);
   });
 });

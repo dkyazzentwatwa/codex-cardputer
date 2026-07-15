@@ -18,7 +18,9 @@ describe("WorkflowRegistry", () => {
     );
     const registry = new WorkflowRegistry();
     await registry.load(file);
-    expect(registry.getWorkflow("demo", "review").prompt).toBe("Review this repo.");
+    expect(registry.getWorkflow("demo", "review").prompt).toBe(
+      "Review this repo.",
+    );
   });
 
   it("rejects relative project paths and unknown fields", async () => {

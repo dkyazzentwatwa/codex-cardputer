@@ -43,14 +43,17 @@ export class JsonlRpcTransport extends EventEmitter {
     output: Readable,
   ) {
     super();
-    output.on("data", (chunk: Buffer | string) => this.ingest(chunk.toString()));
+    output.on("data", (chunk: Buffer | string) =>
+      this.ingest(chunk.toString()),
+    );
     output.on("end", () => this.close(new Error("App Server stdout ended")));
     output.on("error", (error) => this.close(error));
     input.on("error", (error) => this.close(error));
   }
 
   request<T = unknown>(method: string, params: unknown): Promise<T> {
-    if (this.closed) return Promise.reject(new Error("JSONL RPC transport is closed"));
+    if (this.closed)
+      return Promise.reject(new Error("JSONL RPC transport is closed"));
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: (value) => resolve(value as T), reject });
@@ -126,7 +129,13 @@ export class JsonlRpcTransport extends EventEmitter {
     if (!pending) return;
     this.pending.delete(message.id);
     if (message.error) {
-      pending.reject(new RpcRemoteError(message.error.code, message.error.message, message.error.data));
+      pending.reject(
+        new RpcRemoteError(
+          message.error.code,
+          message.error.message,
+          message.error.data,
+        ),
+      );
     } else {
       pending.resolve(message.result);
     }

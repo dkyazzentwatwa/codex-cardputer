@@ -35,11 +35,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "enum": [
-                  "keyboard",
-                  "display",
-                  "hold-confirm"
-                ]
+                "enum": ["keyboard", "display", "hold-confirm"]
               }
             }
           },
@@ -66,10 +62,7 @@
               "maxLength": 128
             }
           },
-          "required": [
-            "type",
-            "nonce"
-          ],
+          "required": ["type", "nonce"],
           "additionalProperties": false
         },
         {
@@ -85,10 +78,7 @@
               "maxLength": 128
             }
           },
-          "required": [
-            "type",
-            "taskId"
-          ],
+          "required": ["type", "taskId"],
           "additionalProperties": false
         },
         {
@@ -109,11 +99,7 @@
               "maxLength": 128
             }
           },
-          "required": [
-            "type",
-            "requestId",
-            "taskId"
-          ],
+          "required": ["type", "requestId", "taskId"],
           "additionalProperties": false
         },
         {
@@ -138,12 +124,7 @@
               "minLength": 1
             }
           },
-          "required": [
-            "type",
-            "requestId",
-            "taskId",
-            "prompt"
-          ],
+          "required": ["type", "requestId", "taskId", "prompt"],
           "additionalProperties": false
         },
         {
@@ -169,12 +150,7 @@
               "maxLength": 128
             }
           },
-          "required": [
-            "type",
-            "requestId",
-            "projectId",
-            "workflowId"
-          ],
+          "required": ["type", "requestId", "projectId", "workflowId"],
           "additionalProperties": false
         },
         {
@@ -203,12 +179,7 @@
               "maxLength": 8000
             }
           },
-          "required": [
-            "type",
-            "requestId",
-            "projectId",
-            "skillName"
-          ],
+          "required": ["type", "requestId", "projectId", "skillName"],
           "additionalProperties": false
         },
         {
@@ -230,19 +201,10 @@
             },
             "decision": {
               "type": "string",
-              "enum": [
-                "accept",
-                "decline",
-                "cancel"
-              ]
+              "enum": ["accept", "decline", "cancel"]
             }
           },
-          "required": [
-            "type",
-            "requestId",
-            "approvalId",
-            "decision"
-          ],
+          "required": ["type", "requestId", "approvalId", "decision"],
           "additionalProperties": false
         },
         {
@@ -253,9 +215,7 @@
               "const": "snapshot.request"
             }
           },
-          "required": [
-            "type"
-          ],
+          "required": ["type"],
           "additionalProperties": false
         }
       ]
@@ -425,11 +385,7 @@
                         },
                         "confirmation": {
                           "type": "string",
-                          "enum": [
-                            "none",
-                            "press_again",
-                            "hold"
-                          ]
+                          "enum": ["none", "press_again", "hold"]
                         },
                         "enabled": {
                           "type": "boolean"
@@ -469,10 +425,7 @@
               }
             }
           },
-          "required": [
-            "type",
-            "tasks"
-          ],
+          "required": ["type", "tasks"],
           "additionalProperties": false
         },
         {
@@ -599,11 +552,7 @@
                       },
                       "confirmation": {
                         "type": "string",
-                        "enum": [
-                          "none",
-                          "press_again",
-                          "hold"
-                        ]
+                        "enum": ["none", "press_again", "hold"]
                       },
                       "enabled": {
                         "type": "boolean"
@@ -642,10 +591,7 @@
               "additionalProperties": false
             }
           },
-          "required": [
-            "type",
-            "task"
-          ],
+          "required": ["type", "task"],
           "additionalProperties": false
         },
         {
@@ -661,10 +607,7 @@
               "maxLength": 128
             }
           },
-          "required": [
-            "type",
-            "taskId"
-          ],
+          "required": ["type", "taskId"],
           "additionalProperties": false
         },
         {
@@ -689,12 +632,7 @@
                 },
                 "type": {
                   "type": "string",
-                  "enum": [
-                    "command",
-                    "file_change",
-                    "network",
-                    "permissions"
-                  ]
+                  "enum": ["command", "file_change", "network", "permissions"]
                 },
                 "title": {
                   "type": "string",
@@ -716,11 +654,7 @@
                 },
                 "risk": {
                   "type": "string",
-                  "enum": [
-                    "low",
-                    "medium",
-                    "high"
-                  ]
+                  "enum": ["low", "medium", "high"]
                 },
                 "riskReason": {
                   "type": "string",
@@ -743,11 +677,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "enum": [
-                      "accept",
-                      "decline",
-                      "cancel"
-                    ]
+                    "enum": ["accept", "decline", "cancel"]
                   }
                 }
               },
@@ -764,10 +694,7 @@
               "additionalProperties": false
             }
           },
-          "required": [
-            "type",
-            "approval"
-          ],
+          "required": ["type", "approval"],
           "additionalProperties": false
         },
         {
@@ -784,17 +711,10 @@
             },
             "decision": {
               "type": "string",
-              "enum": [
-                "accept",
-                "decline",
-                "cancel"
-              ]
+              "enum": ["accept", "decline", "cancel"]
             }
           },
-          "required": [
-            "type",
-            "approvalId"
-          ],
+          "required": ["type", "approvalId"],
           "additionalProperties": false
         },
         {
@@ -847,11 +767,7 @@
                   },
                   "confirmation": {
                     "type": "string",
-                    "enum": [
-                      "none",
-                      "press_again",
-                      "hold"
-                    ]
+                    "enum": ["none", "press_again", "hold"]
                   },
                   "enabled": {
                     "type": "boolean"
@@ -874,10 +790,7 @@
               }
             }
           },
-          "required": [
-            "type",
-            "macros"
-          ],
+          "required": ["type", "macros"],
           "additionalProperties": false
         },
         {
@@ -889,12 +802,7 @@
             },
             "level": {
               "type": "string",
-              "enum": [
-                "info",
-                "success",
-                "warning",
-                "error"
-              ]
+              "enum": ["info", "success", "warning", "error"]
             },
             "message": {
               "type": "string",
@@ -907,11 +815,7 @@
               "maxLength": 128
             }
           },
-          "required": [
-            "type",
-            "level",
-            "message"
-          ],
+          "required": ["type", "level", "message"],
           "additionalProperties": false
         },
         {
@@ -939,12 +843,7 @@
               "type": "boolean"
             }
           },
-          "required": [
-            "type",
-            "code",
-            "message",
-            "recoverable"
-          ],
+          "required": ["type", "code", "message", "recoverable"],
           "additionalProperties": false
         },
         {
@@ -960,18 +859,12 @@
               "maxLength": 128
             }
           },
-          "required": [
-            "type",
-            "nonce"
-          ],
+          "required": ["type", "nonce"],
           "additionalProperties": false
         }
       ]
     }
   },
-  "required": [
-    "deviceMessage",
-    "serverMessage"
-  ],
+  "required": ["deviceMessage", "serverMessage"],
   "additionalProperties": false
 }

@@ -17,4 +17,7 @@ export type ApprovalDecision = z.infer<typeof approvalDecisionSchema>;
 export type ApprovalRequest = z.infer<typeof approvalRequestSchema>;
 export type DeviceMessage = z.infer<typeof deviceMessageSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
-export type MutatingDeviceMessage = Extract<DeviceMessage, { requestId: string }>;
+export type MutatingDeviceMessage = Extract<
+  DeviceMessage,
+  { requestId: string }
+>;

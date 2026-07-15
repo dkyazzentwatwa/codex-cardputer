@@ -3,7 +3,9 @@ import { commandCategory, sanitizeSummary } from "../tasks/summary-builder.js";
 import type { TaskRegistry } from "../tasks/task-registry.js";
 
 function record(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return value !== null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function text(value: unknown): string | undefined {
@@ -11,6 +13,8 @@ function text(value: unknown): string | undefined {
 }
 
 export class EventNormalizer {
+  private readonly summaryPriority = new Map<string, number>();
+
   constructor(private readonly tasks: TaskRegistry) {}
 
   handle(notification: AppServerNotification): void {
@@ -22,13 +26,17 @@ export class EventNormalizer {
 
     if (notification.method === "turn/started") {
       const turnId = text(record(params.turn).id);
-      if (turnId) this.tasks.beginTurn(task.id, turnId);
+      if (turnId) {
+        this.summaryPriority.delete(task.id);
+        this.tasks.beginTurn(task.id, turnId);
+      }
       return;
     }
 
     if (notification.method === "turn/completed") {
       const status = text(record(params.turn).status) ?? "completed";
-      if (status === "failed") this.tasks.transition(task.id, "failed", "Codex turn failed");
+      if (status === "failed")
+        this.tasks.transition(task.id, "failed", "Codex turn failed");
       else if (status === "interrupted" || status === "cancelled")
         this.tasks.transition(task.id, "cancelled", "Task cancelled");
       else this.tasks.transition(task.id, "completed", task.summary);
@@ -37,26 +45,45 @@ export class EventNormalizer {
 
     if (notification.method === "turn/plan/updated") {
       const plan = Array.isArray(params.plan) ? params.plan : [];
-      const active = plan.map(record).find((step) => step.status === "in_progress");
+      const active = plan
+        .map(record)
+        .find((step) => step.status === "in_progress");
       const step = text(active?.step) ?? text(active?.text);
-      if (step) this.tasks.updateSummary(task.id, step);
+      if (step) this.update(task.id, step, 4);
       return;
     }
 
-    if (notification.method !== "item/started" && notification.method !== "item/completed") return;
+    if (
+      notification.method !== "item/started" &&
+      notification.method !== "item/completed"
+    )
+      return;
     const item = record(params.item);
     const itemType = text(item.type);
-    if (itemType === "agentMessage" && notification.method === "item/completed") {
+    if (
+      itemType === "agentMessage" &&
+      notification.method === "item/completed"
+    ) {
       const message = text(item.text) ?? text(item.message);
-      if (message) this.tasks.updateSummary(task.id, sanitizeSummary(message));
+      if (message) this.update(task.id, sanitizeSummary(message), 3);
     } else if (itemType === "commandExecution") {
       const command = text(item.command) ?? "command";
-      this.tasks.updateSummary(task.id, commandCategory(command));
+      this.update(task.id, commandCategory(command), 2);
     } else if (itemType === "fileChange") {
-      this.tasks.updateSummary(
+      this.update(
         task.id,
-        notification.method === "item/started" ? "Applying file changes" : "File changes applied",
+        notification.method === "item/started"
+          ? "Applying file changes"
+          : "File changes applied",
+        1,
       );
     }
+  }
+
+  private update(taskId: string, summary: string, priority: number): void {
+    const current = this.summaryPriority.get(taskId) ?? 0;
+    if (priority < current) return;
+    this.summaryPriority.set(taskId, priority);
+    this.tasks.updateSummary(taskId, summary);
   }
 }

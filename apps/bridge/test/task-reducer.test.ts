@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { TaskRegistry } from "../src/tasks/task-registry.js";
 
-function createTask(registry: TaskRegistry, id: string, status: "starting" | "running" = "starting") {
+function createTask(
+  registry: TaskRegistry,
+  id: string,
+  status: "starting" | "running" = "starting",
+) {
   const now = new Date().toISOString();
   return registry.create({
     id,
@@ -24,7 +28,9 @@ describe("TaskRegistry", () => {
     registry.transition("one", "waiting_approval");
     registry.transition("one", "running");
     registry.transition("one", "completed");
-    expect(() => registry.transition("one", "running")).toThrow(/Invalid task transition/);
+    expect(() => registry.transition("one", "running")).toThrow(
+      /Invalid task transition/,
+    );
   });
 
   it("sorts attention tasks above running tasks", () => {
@@ -32,7 +38,10 @@ describe("TaskRegistry", () => {
     createTask(registry, "running", "running");
     createTask(registry, "attention", "running");
     registry.transition("attention", "waiting_input", "Answer on desktop");
-    expect(registry.all().map((task) => task.id)).toEqual(["attention", "running"]);
+    expect(registry.all().map((task) => task.id)).toEqual([
+      "attention",
+      "running",
+    ]);
   });
 
   it("marks active tasks stale and restores the prior state", () => {

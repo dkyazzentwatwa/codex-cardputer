@@ -16,7 +16,9 @@
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
     "codex:compat": "node tools/generate-codex-schema.mjs --check",
-    "firmware:build": "./tools/build-firmware.sh"
+    "firmware:build": "./tools/build-firmware.sh",
+    "firmware:test:build": "./tools/build-firmware-tests.sh",
+    "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build && pnpm codex:compat && pnpm firmware:build && pnpm firmware:test:build"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
