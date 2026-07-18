@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { taskStatusSchema, taskSummarySchema } from "@codexdeck/protocol";
@@ -52,5 +52,6 @@ export class StateStore {
       mode: 0o600,
     });
     await rename(temporary, this.filePath);
+    await chmod(this.filePath, 0o600);
   }
 }

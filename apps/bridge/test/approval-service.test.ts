@@ -59,4 +59,37 @@ describe("approval safety", () => {
     expect(respond).toHaveBeenCalledWith({ decision: "accept" });
     expect(tasks.require("task-1").status).toBe("running");
   });
+
+  it("allows session approval only through the desktop management surface", () => {
+    const tasks = new TaskRegistry();
+    const now = new Date().toISOString();
+    tasks.create({
+      id: "task-desktop",
+      threadId: "thread-desktop",
+      turnId: "turn-desktop",
+      projectId: "project",
+      title: "Task",
+      status: "running",
+      summary: "Working",
+      startedAt: now,
+      updatedAt: now,
+    });
+    const respond = vi.fn();
+    const service = new ApprovalService(tasks);
+    const approval = service.open({
+      id: 2,
+      method: "item/commandExecution/requestApproval",
+      params: { threadId: "thread-desktop", command: "pnpm test" },
+      respond,
+      reject: vi.fn(),
+    });
+
+    expect(service.desktopList()[0]?.desktopDecisions).toContain(
+      "acceptForSession",
+    );
+    service.respondDesktop(approval?.id ?? "", {
+      decision: "acceptForSession",
+    });
+    expect(respond).toHaveBeenCalledWith({ decision: "acceptForSession" });
+  });
 });

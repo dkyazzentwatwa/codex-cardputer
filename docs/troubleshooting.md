@@ -2,8 +2,13 @@
 
 ## Bridge reports degraded health
 
-Run `codex --version` and `pnpm codex:compat`. The bridge requires a working
-local Codex CLI and starts exactly `codex app-server --listen stdio://`.
+Open CodexDeck from the menu bar and check Diagnostics. The app shows Codex
+readiness, the listening address, connected devices, recent structured logs,
+and the last bridge error. Use Restart after correcting the configuration.
+
+For terminal diagnosis, run `codex --version` and `pnpm codex:compat`. The bridge
+requires a working local Codex CLI and starts exactly
+`codex app-server --listen stdio://`.
 Warnings on App Server stderr are logged but do not by themselves mean the
 adapter is unavailable. Check `codexReady` in `/healthz`.
 
@@ -28,9 +33,27 @@ replaces the prior ESP32 Preferences values.
 
 ## A request waits for desktop input
 
-This is expected for v1. The Cardputer shows `INPUT`; answer the
-`request_user_input` prompt in the bridge terminal. No structured answer is
-sent from the device.
+This is expected for v1. The Cardputer shows `INPUT`; click the amber CodexDeck
+menu bar icon and answer the native prompt. No structured answer is sent from
+the device. Terminal-launched bridges retain the terminal input fallback.
+
+## Another bridge is already running
+
+CodexDeck never kills a process it does not own. When a matching health endpoint
+is detected, the app reports an external bridge and provides view-only status.
+Stop that bridge in its original terminal, choose another port, or retry.
+
+## Codex is installed but the app cannot find it
+
+Finder-launched apps do not inherit the shell's full PATH. CodexDeck searches
+Homebrew, NVM versions, and the login shell. In General settings, use Choose to
+select the executable directly. The saved absolute path is used for later
+launches.
+
+## Start at Login is denied
+
+Open System Settings, General, Login Items and confirm CodexDeck is allowed.
+Then toggle Start companion at login again in CodexDeck General settings.
 
 ## Approval does not submit
 

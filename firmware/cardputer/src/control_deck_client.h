@@ -17,6 +17,16 @@ struct ApprovalState {
   char riskReason[97] = {};
 };
 
+struct UsageState {
+  bool received = false;
+  bool available = false;
+  char limitName[33] = {};
+  int16_t primaryRemainingPercent = -1;
+  uint32_t primaryWindowMinutes = 0;
+  int16_t secondaryRemainingPercent = -1;
+  uint32_t secondaryWindowMinutes = 0;
+};
+
 class ControlDeckClient {
  public:
   void begin(const String& host, uint16_t port);
@@ -32,6 +42,7 @@ class ControlDeckClient {
   const codexdeck::MacroState* globalMacro(size_t index) const;
   size_t globalMacroCount() const;
   const ApprovalState& approval() const;
+  const UsageState& usage() const;
   const char* toast() const;
   void sendSelect(const char* taskId);
   void sendStop(const char* taskId);
@@ -39,6 +50,7 @@ class ControlDeckClient {
   void sendWorkflow(const char* macroId);
   void sendSkill(const char* macroId);
   void sendApproval(const char* approvalId, const char* decision);
+  void sendClearFinished();
   void requestSnapshot();
 
  private:
@@ -56,7 +68,9 @@ class ControlDeckClient {
   codexdeck::MacroState globalMacros_[codexdeck::MAX_GLOBAL_MACROS] = {};
   size_t globalMacroCount_ = 0;
   ApprovalState approval_;
+  UsageState usage_;
   char toast_[97] = {};
+  uint32_t toastExpiresAt_ = 0;
 
   void connectSocket();
   void onSocketEvent(WStype_t type, uint8_t* payload, size_t length);

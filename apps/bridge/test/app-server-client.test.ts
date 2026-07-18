@@ -39,7 +39,13 @@ describe("AppServerClient", () => {
             ? { userAgent: "test" }
             : message.method === "thread/start"
               ? { thread: { id: "thread-1" } }
-              : { turn: { id: "turn-1" } };
+              : message.method === "account/rateLimits/read"
+                ? {
+                    rateLimits: {
+                      primary: { usedPercent: 28, windowDurationMins: 300 },
+                    },
+                  }
+                : { turn: { id: "turn-1" } };
         process.stdout.write(`${JSON.stringify({ id: message.id, result })}\n`);
       }
     });
@@ -58,6 +64,9 @@ describe("AppServerClient", () => {
         { type: "text", text: "hello", text_elements: [] },
       ]),
     ).resolves.toEqual({ id: "turn-1" });
+    await expect(client.readRateLimits()).resolves.toMatchObject({
+      rateLimits: { primary: { usedPercent: 28 } },
+    });
     expect(client.ready).toBe(true);
     client.stop();
   });

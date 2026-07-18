@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import path from "node:path";
+import { z } from "zod";
 
 import type { ApprovalDecision, ApprovalRequest } from "@codexdeck/protocol";
 
@@ -12,6 +13,50 @@ import { classifyRisk } from "./risk-classifier.js";
 interface PendingApproval {
   approval: ApprovalRequest;
   request: AppServerServerRequest;
+}
+
+const desktopDecisionSchema = z.union([
+  z.enum(["accept", "acceptForSession", "decline", "cancel"]),
+  z
+    .object({
+      acceptWithExecpolicyAmendment: z
+        .object({ execpolicy_amendment: z.array(z.string().min(1)).min(1) })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      applyNetworkPolicyAmendment: z
+        .object({
+          network_policy_amendment: z
+            .object({
+              action: z.enum(["allow", "deny"]),
+              host: z.string().min(1),
+            })
+            .strict(),
+        })
+        .strict(),
+    })
+    .strict(),
+]);
+
+const desktopResponseSchema = z.union([
+  z.object({ decision: desktopDecisionSchema }).strict(),
+  z
+    .object({
+      permissions: z.record(z.string(), z.unknown()),
+      scope: z.enum(["turn", "session"]).optional(),
+      strictAutoReview: z.boolean().nullable().optional(),
+    })
+    .strict(),
+]);
+
+export type DesktopApprovalResponse = z.infer<typeof desktopResponseSchema>;
+
+export interface DesktopApproval {
+  approval: ApprovalRequest;
+  method: string;
+  desktopDecisions: Array<"accept" | "acceptForSession" | "decline" | "cancel">;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -103,19 +148,49 @@ export class ApprovalService extends EventEmitter {
     return [...this.pending.values()].map(({ approval }) => approval);
   }
 
+  desktopList(): DesktopApproval[] {
+    return [...this.pending.values()].map(({ approval, request }) => ({
+      approval,
+      method: request.method,
+      desktopDecisions: request.method.includes("permissions")
+        ? ["decline", "cancel"]
+        : ["accept", "acceptForSession", "decline", "cancel"],
+    }));
+  }
+
   respond(approvalId: string, decision: ApprovalDecision): ApprovalRequest {
     const pending = this.pending.get(approvalId);
     if (!pending) throw new Error(`Approval not found: ${approvalId}`);
     if (!pending.approval.allowedDecisions.includes(decision))
       throw new Error(`Decision not allowed: ${decision}`);
     pending.request.respond({ decision });
+    return this.finish(approvalId, decision);
+  }
+
+  respondDesktop(approvalId: string, response: unknown): ApprovalRequest {
+    const pending = this.pending.get(approvalId);
+    if (!pending) throw new Error(`Approval not found: ${approvalId}`);
+    const parsed = desktopResponseSchema.parse(response);
+    pending.request.respond(parsed);
+    const decision =
+      "decision" in parsed && typeof parsed.decision === "string"
+        ? parsed.decision
+        : "accept";
+    return this.finish(approvalId, decision);
+  }
+
+  private finish(approvalId: string, decision: string): ApprovalRequest {
+    const pending = this.pending.get(approvalId);
+    if (!pending) throw new Error(`Approval not found: ${approvalId}`);
     this.pending.delete(approvalId);
     const task = this.tasks.require(pending.approval.taskId);
     if (task.status === "waiting_approval") {
       this.tasks.transition(
         task.id,
         "running",
-        decision === "accept" ? "Approval accepted" : "Approval declined",
+        decision === "accept" || decision === "acceptForSession"
+          ? "Approval accepted"
+          : "Approval declined",
       );
     }
     this.emit("resolved", { approvalId, decision });

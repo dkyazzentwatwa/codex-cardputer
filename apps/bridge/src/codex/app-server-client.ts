@@ -5,6 +5,7 @@ import type { Readable, Writable } from "node:stream";
 import { JsonlRpcTransport } from "./jsonl-rpc.js";
 import type {
   AppServerNotification,
+  AppServerRateLimitsResponse,
   AppServerServerRequest,
   AppServerThread,
   AppServerTurn,
@@ -129,6 +130,23 @@ export class AppServerClient extends EventEmitter {
     return response.thread;
   }
 
+  async listThreads(params: {
+    limit?: number;
+    cwd?: string[];
+    sourceKinds?: string[];
+  } = {}): Promise<AppServerThread[]> {
+    const response = await this.rpc<{ data: AppServerThread[] }>("thread/list", {
+      archived: false,
+      limit: params.limit ?? 20,
+      sortKey: "updated_at",
+      sortDirection: "desc",
+      ...(params.cwd?.length ? { cwd: params.cwd } : {}),
+      ...(params.sourceKinds?.length ? { sourceKinds: params.sourceKinds } : {}),
+      useStateDbOnly: false,
+    });
+    return response.data;
+  }
+
   async startTurn(
     threadId: string,
     input: AppServerUserInput[],
@@ -159,6 +177,10 @@ export class AppServerClient extends EventEmitter {
     return response.data
       .flatMap((entry) => entry.skills)
       .filter((skill) => skill.enabled);
+  }
+
+  async readRateLimits(): Promise<AppServerRateLimitsResponse> {
+    return this.rpc<AppServerRateLimitsResponse>("account/rateLimits/read", {});
   }
 
   private rpc<T = unknown>(method: string, params: unknown): Promise<T> {

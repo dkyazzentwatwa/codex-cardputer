@@ -1,6 +1,20 @@
+version: 1
 port: 8765
-# Omit bindHost to choose the first private IPv4 interface, or loopback when none exists.
-# bindHost: 192.168.1.20
+bindMode: auto_private
+# Use bindMode: explicit with bindHost: 192.168.1.20, or bindMode: loopback.
 codexPath: codex
 workflowsFile: workflows.example.yaml
+startOnLaunch: true
+notifications:
+  attention: true
+  deviceChanges: false
+# Read-only activity mirror for local Codex sessions not started by CodexDeck.
+# These sessions can light the Cardputer but cannot be controlled from it.
+externalSessions:
+  enabled: true
+  pollSeconds: 5
+  maxSessions: 8
+  # Optional exact project directories. Empty observes all local sessions.
+  cwd: []
+  sourceKinds: [cli, vscode, exec, appServer, unknown]
 prettyLogs: true

@@ -18,7 +18,11 @@
     "codex:compat": "node tools/generate-codex-schema.mjs --check",
     "firmware:build": "./tools/build-firmware.sh",
     "firmware:test:build": "./tools/build-firmware-tests.sh",
-    "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build && pnpm codex:compat && pnpm firmware:build && pnpm firmware:test:build"
+    "mac:build": "./tools/mac-swift.sh build",
+    "mac:test": "./tools/mac-swift.sh test",
+    "package:mac": "./tools/package-macos.sh",
+    "mac:smoke": "./tools/test-macos-package.sh",
+    "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build && pnpm mac:test && pnpm codex:compat && pnpm firmware:build && pnpm firmware:test:build"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",

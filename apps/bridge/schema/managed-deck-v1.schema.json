@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://littlehakr.dev/codexdeck/managed-deck-v1.schema.json",
+  "title": "ManagedDeckConfigV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "settings", "projects"],
+  "properties": {
+    "version": { "const": 1 },
+    "settings": { "$ref": "#/$defs/settings" },
+    "projects": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+      "additionalProperties": { "$ref": "#/$defs/project" }
+    }
+  },
+  "$defs": {
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "port",
+        "bindMode",
+        "codexPath",
+        "workflowsFile",
+        "startOnLaunch",
+        "notifications",
+        "prettyLogs"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "bindMode": { "enum": ["auto_private", "loopback", "explicit"] },
+        "bindHost": { "type": "string", "minLength": 1 },
+        "codexPath": { "type": "string", "minLength": 1 },
+        "workflowsFile": { "type": "string", "minLength": 1 },
+        "stateFile": { "type": "string", "minLength": 1 },
+        "logsDirectory": { "type": "string", "minLength": 1 },
+        "startOnLaunch": { "type": "boolean" },
+        "notifications": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attention", "deviceChanges"],
+          "properties": {
+            "attention": { "type": "boolean" },
+            "deviceChanges": { "type": "boolean" }
+          }
+        },
+        "prettyLogs": { "type": "boolean" }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "shortLabel", "prompt", "enabled", "order"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1, "maxLength": 48 },
+        "shortLabel": { "type": "string", "minLength": 1, "maxLength": 16 },
+        "prompt": { "type": "string", "minLength": 1, "maxLength": 8000 },
+        "skill": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$"
+        },
+        "enabled": { "type": "boolean" },
+        "order": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "cwd",
+        "enabled",
+        "order",
+        "approvalPolicy",
+        "sandbox",
+        "workflows"
+      ],
+      "properties": {
+        "label": { "type": "string", "minLength": 1, "maxLength": 48 },
+        "cwd": { "type": "string", "minLength": 1 },
+        "enabled": { "type": "boolean" },
+        "order": { "type": "integer", "minimum": 0 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "approvalPolicy": { "enum": ["untrusted", "on-request", "never"] },
+        "sandbox": {
+          "enum": ["read-only", "workspace-write", "danger-full-access"]
+        },
+        "workflows": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+          "additionalProperties": { "$ref": "#/$defs/workflow" }
+        }
+      }
+    }
+  }
+}

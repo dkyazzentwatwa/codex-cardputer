@@ -9,9 +9,12 @@ child process and is never placed on the LAN.
 
 ```text
 Cardputer ADV -> ws://private-host:8765/device -> TypeScript bridge
-                                                    |
-                                                    v
-                                     codex app-server --listen stdio://
+                                                    |       ^
+                                                    v       |
+                                     codex app-server      loopback + token
+                                      --listen stdio://     |
+                                                    ^       v
+                                              SwiftUI menu companion
 ```
 
 There is no arbitrary command message, shell interpolation, raw output stream,
@@ -37,6 +40,29 @@ cloud relay, or device-side Codex credential.
   mDNS, heartbeats, consistent broadcasts, and per-device idempotency.
 - `StateStore` atomically persists compact managed-task mappings. It does not
   save prompts, command output, credentials, or resolved approval payloads.
+- `ManagementServer` binds only to `127.0.0.1` on a random port, authenticates a
+  per-launch bearer token, and gives the owning companion status, device,
+  logging, reload, shutdown, input, and desktop approval operations.
+- `StructuredLogger` maintains a 200-entry in-memory view and five rotated 1 MB
+  NDJSON files with secret-key and home-directory redaction.
+
+## macOS companion
+
+The macOS 13 SwiftUI app uses `MenuBarExtra` plus a Settings scene. A single
+lifecycle controller owns the bundled Node child process, detects the
+management handshake, polls status, consumes management events, and applies
+bounded 1, 2, 5, then 15-second crash recovery.
+
+Configuration is versioned JSON under Application Support. The app can edit it
+while the bridge is stopped; the bridge validates it again at load. Workflow
+changes reload live, while listener and Codex-path changes restart the owned
+process. Legacy YAML is imported through the bundled, schema-validating Node
+migration helper without modifying the source files.
+
+The release bundle contains the native executable, an Apple Silicon Node
+runtime, the compiled bridge and production dependencies, the management
+schema, and selected offline documentation. Codex CLI remains external so its
+authentication and updates remain user-owned.
 
 ## Recovery
 

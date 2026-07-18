@@ -6,6 +6,59 @@ namespace codexdeck {
 namespace {
 constexpr uint32_t ARM_TIMEOUT_MS = 5000;
 constexpr uint32_t HOLD_DURATION_MS = 1500;
+constexpr uint8_t KEYBOARD_SHORTCUT_MODIFIER_MASK = KeyboardModifierControl | KeyboardModifierShift |
+                                                   KeyboardModifierAlt | KeyboardModifierGui;
+constexpr const char* kKeyboardShortcutPageLabels[] = {"TASKS", "NAV", "PANELS"};
+constexpr DeckTheme kDeckThemes[] = {
+    DeckTheme::NeonGrid,
+    DeckTheme::Terminal,
+    DeckTheme::AmberCrt,
+    DeckTheme::Synthwave,
+    DeckTheme::Ice,
+};
+constexpr const char* kDeckThemeLabels[] = {"NEON GRID", "TERMINAL", "AMBER CRT", "SYNTHWAVE", "ICE"};
+
+constexpr KeyboardShortcut kKeyboardShortcuts[] = {
+    {"escape", "Escape", "Esc", 0, KeyboardModifierNone, KeyboardShortcutKey::Escape},
+    {"new-task", "New Task", "Cmd+N", 0, KeyboardModifierGui, KeyboardShortcutKey::N},
+    {"new-projectless-task", "Projectless Task", "Cmd+Sh+O", 0, KeyboardModifierGui | KeyboardModifierShift,
+     KeyboardShortcutKey::O},
+    {"quick-chat", "Quick Chat", "Cmd+Op+N", 0, KeyboardModifierGui | KeyboardModifierAlt,
+     KeyboardShortcutKey::N},
+    {"archive-task", "Archive Task", "Cmd+Sh+A", 0, KeyboardModifierGui | KeyboardModifierShift,
+     KeyboardShortcutKey::A},
+    {"toggle-pin", "Pin / Unpin", "Cmd+Op+P", 0, KeyboardModifierGui | KeyboardModifierAlt,
+     KeyboardShortcutKey::P},
+    {"open-side-task", "Open Side Task", "Cmd+Op+S", 0, KeyboardModifierGui | KeyboardModifierAlt,
+     KeyboardShortcutKey::S},
+    {"voice-input", "Voice Input", "Ctl+Sh+D", 0, KeyboardModifierControl | KeyboardModifierShift,
+     KeyboardShortcutKey::D},
+    {"previous-task", "Previous Task", "Cmd+Sh+[", 1, KeyboardModifierGui | KeyboardModifierShift,
+     KeyboardShortcutKey::LeftBracket},
+    {"next-task", "Next Task", "Cmd+Sh+]", 1, KeyboardModifierGui | KeyboardModifierShift,
+     KeyboardShortcutKey::RightBracket},
+    {"previous-recent-task", "Previous Recent", "Ctl+Sh+Tab", 1, KeyboardModifierControl | KeyboardModifierShift,
+     KeyboardShortcutKey::Tab},
+    {"next-recent-task", "Next Recent", "Ctl+Tab", 1, KeyboardModifierControl, KeyboardShortcutKey::Tab},
+    {"back", "Back", "Cmd+[", 1, KeyboardModifierGui, KeyboardShortcutKey::LeftBracket},
+    {"forward", "Forward", "Cmd+]", 1, KeyboardModifierGui, KeyboardShortcutKey::RightBracket},
+    {"find", "Find", "Cmd+F", 1, KeyboardModifierGui, KeyboardShortcutKey::F},
+    {"focus-browser-address", "Focus Browser", "Cmd+L", 1, KeyboardModifierGui, KeyboardShortcutKey::L},
+    {"open-browser-tab", "Open Browser Tab", "Cmd+T", 2, KeyboardModifierGui, KeyboardShortcutKey::T},
+    {"open-review-tab", "Open Review Tab", "Ctl+Sh+G", 2, KeyboardModifierControl | KeyboardModifierShift,
+     KeyboardShortcutKey::G},
+    {"toggle-bottom-panel", "Toggle Bottom", "Cmd+J", 2, KeyboardModifierGui, KeyboardShortcutKey::J},
+    {"toggle-browser-panel", "Toggle Browser", "Cmd+Sh+B", 2, KeyboardModifierGui | KeyboardModifierShift,
+     KeyboardShortcutKey::B},
+    {"toggle-side-panel", "Toggle Side", "Cmd+Op+B", 2, KeyboardModifierGui | KeyboardModifierAlt,
+     KeyboardShortcutKey::B},
+    {"open-terminal", "Open Terminal", "Ctl+`", 2, KeyboardModifierControl, KeyboardShortcutKey::Backtick},
+    {"settings", "Settings", "Cmd+,", 2, KeyboardModifierGui, KeyboardShortcutKey::Comma},
+    {"keyboard-shortcuts", "Keyboard Shortcuts", "Cmd+Sh+/", 2, KeyboardModifierGui | KeyboardModifierShift,
+     KeyboardShortcutKey::Slash},
+};
+
+constexpr size_t kKeyboardShortcutCount = sizeof(kKeyboardShortcuts) / sizeof(kKeyboardShortcuts[0]);
 
 bool comesBefore(const TaskState& left, const TaskState& right) {
   if (left.requiresAttention != right.requiresAttention) return left.requiresAttention;
@@ -14,6 +67,19 @@ bool comesBefore(const TaskState& left, const TaskState& right) {
   if (leftRunning != rightRunning) return leftRunning;
   return strcmp(left.updatedAt, right.updatedAt) > 0;
 }
+
+void swapTasks(TaskState& left, TaskState& right) {
+  uint8_t buffer[32];
+  auto* leftBytes = reinterpret_cast<uint8_t*>(&left);
+  auto* rightBytes = reinterpret_cast<uint8_t*>(&right);
+  for (size_t offset = 0; offset < sizeof(TaskState); offset += sizeof(buffer)) {
+    const size_t remaining = sizeof(TaskState) - offset;
+    const size_t chunk = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
+    memcpy(buffer, leftBytes + offset, chunk);
+    memcpy(leftBytes + offset, rightBytes + offset, chunk);
+    memcpy(rightBytes + offset, buffer, chunk);
+  }
+}
 }  // namespace
 
 void copyText(char* destination, size_t capacity, const char* source) {
@@ -21,6 +87,48 @@ void copyText(char* destination, size_t capacity, const char* source) {
   if (!source) source = "";
   strncpy(destination, source, capacity - 1);
   destination[capacity - 1] = '\0';
+}
+
+size_t deckThemeCount() { return sizeof(kDeckThemes) / sizeof(kDeckThemes[0]); }
+
+DeckTheme deckThemeAt(size_t index) {
+  return index < deckThemeCount() ? kDeckThemes[index] : DeckTheme::NeonGrid;
+}
+
+const char* deckThemeLabel(DeckTheme theme) {
+  const size_t index = static_cast<size_t>(theme);
+  return index < deckThemeCount() ? kDeckThemeLabels[index] : "NEON GRID";
+}
+
+bool deckThemeValid(DeckTheme theme) { return static_cast<size_t>(theme) < deckThemeCount(); }
+
+size_t keyboardShortcutCount() { return kKeyboardShortcutCount; }
+
+size_t keyboardShortcutPageCount() {
+  return (kKeyboardShortcutCount + KEYBOARD_SHORTCUT_PAGE_SIZE - 1) / KEYBOARD_SHORTCUT_PAGE_SIZE;
+}
+
+const char* keyboardShortcutPageLabel(size_t page) {
+  return page < keyboardShortcutPageCount() ? kKeyboardShortcutPageLabels[page] : "";
+}
+
+size_t keyboardShortcutPageStart(size_t page) {
+  return page < keyboardShortcutPageCount() ? page * KEYBOARD_SHORTCUT_PAGE_SIZE : kKeyboardShortcutCount;
+}
+
+size_t keyboardShortcutPageItemCount(size_t page) {
+  const size_t start = keyboardShortcutPageStart(page);
+  const size_t remaining = kKeyboardShortcutCount - start;
+  return remaining < KEYBOARD_SHORTCUT_PAGE_SIZE ? remaining : KEYBOARD_SHORTCUT_PAGE_SIZE;
+}
+
+const KeyboardShortcut* keyboardShortcutAt(size_t index) {
+  return index < kKeyboardShortcutCount ? &kKeyboardShortcuts[index] : nullptr;
+}
+
+bool keyboardShortcutValid(const KeyboardShortcut& shortcut) {
+  return shortcut.id && shortcut.id[0] && shortcut.label && shortcut.label[0] && shortcut.combo && shortcut.combo[0] &&
+         shortcut.page < keyboardShortcutPageCount() && (shortcut.modifiers & ~KEYBOARD_SHORTCUT_MODIFIER_MASK) == 0;
 }
 
 const char* statusLabel(TaskStatus status) {
@@ -81,11 +189,24 @@ bool TaskStore::upsert(const TaskState& task) {
 }
 
 bool TaskStore::remove(const char* taskId) {
+  char selectedId[129] = {};
+  if (selected_ < count_) copyText(selectedId, sizeof(selectedId), tasks_[selected_].id);
   for (size_t index = 0; index < count_; ++index) {
     if (strcmp(tasks_[index].id, taskId) != 0) continue;
     for (size_t move = index; move + 1 < count_; ++move) tasks_[move] = tasks_[move + 1];
     --count_;
-    if (selected_ >= count_ && count_ > 0) selected_ = count_ - 1;
+    if (count_ == 0) {
+      selected_ = 0;
+    } else if (strcmp(selectedId, taskId) == 0) {
+      selected_ = index < count_ ? index : count_ - 1;
+    } else {
+      for (size_t candidate = 0; candidate < count_; ++candidate) {
+        if (strcmp(tasks_[candidate].id, selectedId) == 0) {
+          selected_ = candidate;
+          break;
+        }
+      }
+    }
     return true;
   }
   return false;
@@ -95,13 +216,11 @@ void TaskStore::sort() {
   char selectedId[129] = {};
   if (selected_ < count_) copyText(selectedId, sizeof(selectedId), tasks_[selected_].id);
   for (size_t index = 1; index < count_; ++index) {
-    TaskState value = tasks_[index];
     size_t insert = index;
-    while (insert > 0 && comesBefore(value, tasks_[insert - 1])) {
-      tasks_[insert] = tasks_[insert - 1];
+    while (insert > 0 && comesBefore(tasks_[insert], tasks_[insert - 1])) {
+      swapTasks(tasks_[insert], tasks_[insert - 1]);
       --insert;
     }
-    tasks_[insert] = value;
   }
   for (size_t index = 0; index < count_; ++index) {
     if (strcmp(tasks_[index].id, selectedId) == 0) {
@@ -112,6 +231,17 @@ void TaskStore::sort() {
 }
 
 size_t TaskStore::count() const { return count_; }
+
+size_t TaskStore::clearableCount() const {
+  size_t clearable = 0;
+  for (size_t index = 0; index < count_; ++index) {
+    const TaskStatus status = tasks_[index].status;
+    if (status == TaskStatus::Completed || status == TaskStatus::Failed || status == TaskStatus::Cancelled) {
+      ++clearable;
+    }
+  }
+  return clearable;
+}
 
 const TaskState* TaskStore::at(size_t index) const {
   return index < count_ ? &tasks_[index] : nullptr;

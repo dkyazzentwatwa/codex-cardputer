@@ -25,6 +25,10 @@ The bridge state file contains bridge-managed thread and task metadata. It is
 written atomically with mode `0600`. Resolved approval payloads and follow-up
 history are not persisted.
 
+Companion settings, workflows, state, and logs live under the user's
+Application Support directory. JSON files use mode `0600`; the directory uses
+mode `0700`. The app never copies or stores Codex credentials.
+
 ## Constrained actions
 
 YAML defines allowlisted projects, workflows, Codex settings, and prompts. It
@@ -41,6 +45,19 @@ Git history rewrite, credential stores, disk and power commands, system network
 changes, and package publication. Normal acceptance requires two Enter presses
 within five seconds. High-risk acceptance requires a continuous 1.5 second
 hold. Codex remains the source of truth for whether an action requires approval.
+
+## Companion management boundary
+
+The app-management server is separate from port 8765. It always binds to
+`127.0.0.1` on an ephemeral port and requires a randomly generated 256-bit
+bearer token on HTTP and WebSocket requests. The token is passed only through
+the child-process environment, never written to disk or logs, and disappears
+when either process exits. No management endpoint is advertised through mDNS.
+
+The directly distributed companion is intentionally not App Sandbox enabled
+because Codex must launch subprocesses and access the explicitly allowlisted
+project folders. Hardened runtime is enabled. The bundled Node helper is signed
+with the JIT entitlements required by V8.
 
 ## Future compatibility
 

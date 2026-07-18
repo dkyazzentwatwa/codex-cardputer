@@ -34,6 +34,7 @@ describe("codexdeck.v1 schemas", () => {
           title: "Control Deck",
           status: "running",
           summary: "Running protocol tests",
+          detail: "Readable result ".repeat(40).trim(),
           startedAt: "2026-07-15T19:00:00.000Z",
           updatedAt: "2026-07-15T19:00:01.000Z",
           elapsedSeconds: 1,
@@ -97,5 +98,42 @@ describe("codexdeck.v1 schemas", () => {
       prompt: "é".repeat(121),
     };
     expect(deviceMessageSchema.safeParse(message).success).toBe(false);
+  });
+
+  it("accepts only the strict clear-finished request shape", () => {
+    expect(
+      deviceMessageSchema.safeParse({
+        type: "tasks.clear.request",
+        requestId: "clear-1",
+      }).success,
+    ).toBe(true);
+    expect(
+      deviceMessageSchema.safeParse({
+        type: "tasks.clear.request",
+        requestId: "clear-1",
+        includeActive: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts bounded Codex usage windows", () => {
+    expect(
+      serverMessageSchema.parse({
+        type: "usage.update",
+        available: true,
+        limitName: "Codex",
+        primaryRemainingPercent: 72,
+        primaryWindowMinutes: 300,
+        secondaryRemainingPercent: 41,
+        secondaryWindowMinutes: 10080,
+      }),
+    ).toMatchObject({ primaryRemainingPercent: 72 });
+    expect(
+      serverMessageSchema.safeParse({
+        type: "usage.update",
+        available: true,
+        primaryRemainingPercent: 101,
+      }).success,
+    ).toBe(false);
   });
 });

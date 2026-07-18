@@ -8,6 +8,20 @@ namespace codexdeck {
 constexpr size_t MAX_TASKS = 20;
 constexpr size_t MAX_TASK_MACROS = 12;
 constexpr size_t MAX_GLOBAL_MACROS = 20;
+constexpr size_t KEYBOARD_SHORTCUT_PAGE_SIZE = 8;
+
+enum class DeckTheme : uint8_t {
+  NeonGrid,
+  Terminal,
+  AmberCrt,
+  Synthwave,
+  Ice,
+};
+
+size_t deckThemeCount();
+DeckTheme deckThemeAt(size_t index);
+const char* deckThemeLabel(DeckTheme theme);
+bool deckThemeValid(DeckTheme theme);
 
 enum class TaskStatus : uint8_t {
   Starting,
@@ -29,6 +43,53 @@ struct MacroState {
   bool enabled = false;
 };
 
+enum KeyboardShortcutModifier : uint8_t {
+  KeyboardModifierNone = 0,
+  KeyboardModifierControl = 1 << 0,
+  KeyboardModifierShift = 1 << 1,
+  KeyboardModifierAlt = 1 << 2,
+  KeyboardModifierGui = 1 << 3,
+};
+
+enum class KeyboardShortcutKey : uint8_t {
+  Escape,
+  Tab,
+  LeftBracket,
+  RightBracket,
+  Comma,
+  D,
+  Slash,
+  Backtick,
+  A,
+  B,
+  F,
+  G,
+  J,
+  L,
+  N,
+  O,
+  P,
+  S,
+  T,
+};
+
+struct KeyboardShortcut {
+  const char* id;
+  const char* label;
+  const char* combo;
+  uint8_t page;
+  uint8_t modifiers;
+  KeyboardShortcutKey key;
+};
+
+size_t keyboardShortcutCount();
+size_t keyboardShortcutPageCount();
+const char* keyboardShortcutPageLabel(size_t page);
+size_t keyboardShortcutPageStart(size_t page);
+size_t keyboardShortcutPageItemCount(size_t page);
+const KeyboardShortcut* keyboardShortcutAt(size_t index);
+bool keyboardShortcutValid(const KeyboardShortcut& shortcut);
+
 struct TaskState {
   char id[129] = {};
   char threadId[129] = {};
@@ -36,7 +97,7 @@ struct TaskState {
   char projectId[65] = {};
   char title[29] = {};
   char summary[65] = {};
-  char detail[161] = {};
+  char detail[769] = {};
   char updatedAt[40] = {};
   char pendingApprovalId[129] = {};
   TaskStatus status = TaskStatus::Starting;
@@ -59,6 +120,7 @@ class TaskStore {
   bool remove(const char* taskId);
   void sort();
   size_t count() const;
+  size_t clearableCount() const;
   const TaskState* at(size_t index) const;
   TaskState* find(const char* taskId);
   const TaskState* selected() const;

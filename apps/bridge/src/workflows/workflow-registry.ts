@@ -7,19 +7,23 @@ import { z } from "zod";
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const SKILL_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/;
 
-const workflowSchema = z
+export const workflowSchema = z
   .object({
     label: z.string().trim().min(1).max(48),
     shortLabel: z.string().trim().min(1).max(16),
     prompt: z.string().trim().min(1).max(8000),
     skill: z.string().regex(SKILL_IDENTIFIER).optional(),
+    enabled: z.boolean().default(true),
+    order: z.number().int().min(0).default(0),
   })
   .strict();
 
-const projectSchema = z
+export const projectSchema = z
   .object({
     label: z.string().trim().min(1).max(48),
     cwd: z.string().min(1),
+    enabled: z.boolean().default(true),
+    order: z.number().int().min(0).default(0),
     model: z.string().trim().min(1).max(80).optional(),
     approvalPolicy: z
       .enum(["untrusted", "on-request", "never"])
@@ -31,8 +35,11 @@ const projectSchema = z
   })
   .strict();
 
-const registrySchema = z
-  .object({ projects: z.record(z.string().regex(IDENTIFIER), projectSchema) })
+export const registrySchema = z
+  .object({
+    version: z.literal(1).default(1),
+    projects: z.record(z.string().regex(IDENTIFIER), projectSchema),
+  })
   .strict();
 
 export type WorkflowDefinition = z.infer<typeof workflowSchema>;
@@ -53,7 +60,7 @@ export class WorkflowRegistry {
       if (!path.isAbsolute(project.cwd))
         throw new Error(`Project ${id} cwd must be absolute`);
       await access(project.cwd);
-      next.set(id, { id, ...project });
+      if (project.enabled) next.set(id, { id, ...project });
     }
     this.projects = next;
   }
@@ -66,12 +73,15 @@ export class WorkflowRegistry {
 
   getWorkflow(projectId: string, workflowId: string): WorkflowDefinition {
     const workflow = this.getProject(projectId).workflows[workflowId];
-    if (!workflow)
+    if (!workflow?.enabled)
       throw new Error(`Unknown workflow: ${projectId}/${workflowId}`);
     return workflow;
   }
 
   list(): ProjectDefinition[] {
-    return [...this.projects.values()];
+    return [...this.projects.values()].sort(
+      (left, right) =>
+        left.order - right.order || left.label.localeCompare(right.label),
+    );
   }
 }

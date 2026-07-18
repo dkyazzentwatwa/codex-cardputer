@@ -10,14 +10,28 @@ import {
   parseDeviceFrame,
 } from "@codexdeck/protocol";
 import type { ServerMessage } from "@codexdeck/protocol";
+import type { UsageUpdate } from "@codexdeck/protocol";
 
 import type { ApprovalService } from "../approvals/approval-service.js";
-import type { TaskRegistry } from "../tasks/task-registry.js";
+import { toTaskSummary, type TaskRegistry } from "../tasks/task-registry.js";
 import type { MessageRouter } from "./message-router.js";
+
+export interface ConnectedDevice {
+  deviceId: string;
+  deviceName: string;
+  hardware: string;
+  firmwareVersion: string;
+  protocol: string;
+  capabilities: string[];
+  connectedAt: string;
+  lastSeen: string;
+}
 
 export class DeviceSession {
   private deviceId: string | undefined;
   private lastSeen = Date.now();
+  private readonly connectedAt = new Date().toISOString();
+  private details: ConnectedDevice | undefined;
   private readonly heartbeat: NodeJS.Timeout;
 
   constructor(
@@ -27,6 +41,10 @@ export class DeviceSession {
     private readonly approvals: ApprovalService,
     private readonly router: MessageRouter,
     onClose: () => void,
+    private readonly onUpdate: (device: ConnectedDevice) => void = () =>
+      undefined,
+    private readonly currentUsage: () => UsageUpdate | undefined = () =>
+      undefined,
   ) {
     socket.on("message", (data, isBinary) => {
       if (isBinary) {
@@ -58,6 +76,12 @@ export class DeviceSession {
     if (this.socket.readyState === this.socket.OPEN) this.socket.close();
   }
 
+  info(): ConnectedDevice | undefined {
+    return this.details
+      ? { ...this.details, capabilities: [...this.details.capabilities] }
+      : undefined;
+  }
+
   private async receive(frame: string): Promise<void> {
     this.lastSeen = Date.now();
     try {
@@ -74,6 +98,17 @@ export class DeviceSession {
           return;
         }
         this.deviceId = message.deviceId;
+        this.details = {
+          deviceId: message.deviceId,
+          deviceName: message.deviceName,
+          hardware: message.deviceName,
+          firmwareVersion: message.firmwareVersion,
+          protocol: message.protocol,
+          capabilities: [...message.capabilities],
+          connectedAt: this.connectedAt,
+          lastSeen: new Date(this.lastSeen).toISOString(),
+        };
+        this.onUpdate(this.details);
         this.send({
           type: "welcome",
           protocol: PROTOCOL_VERSION,
@@ -83,17 +118,23 @@ export class DeviceSession {
         });
         this.send({
           type: "task.snapshot",
-          tasks: this.tasks.all().slice(0, 20),
+          tasks: this.tasks.all().slice(0, 20).map(toTaskSummary),
         });
         this.send({
           type: "macro.snapshot",
           macros: this.router.macroSnapshot(),
         });
+        const usage = this.currentUsage();
+        if (usage) this.send(usage);
         for (const approval of this.approvals.list())
           this.send({ type: "approval.open", approval });
         return;
       }
       if (message.type === "hello") return;
+      if (this.details) {
+        this.details.lastSeen = new Date(this.lastSeen).toISOString();
+        this.onUpdate(this.details);
+      }
       for (const response of await this.router.handle(this.deviceId, message))
         this.send(response);
     } catch (error) {

@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { StateStore } from "../src/persistence/state-store.js";
+import { TaskRegistry } from "../src/tasks/task-registry.js";
 
 describe("StateStore", () => {
   it("writes and reloads state atomically", async () => {
@@ -42,5 +43,40 @@ describe("StateStore", () => {
       tasks: [],
       display: {},
     });
+  });
+
+  it("keeps cleared terminal history removed after restart", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "codexdeck-state-"));
+    const store = new StateStore(path.join(root, "state.json"));
+    const tasks = new TaskRegistry();
+    const now = new Date().toISOString();
+    tasks.create({
+      id: "finished",
+      threadId: "thread-finished",
+      projectId: "demo",
+      title: "Finished",
+      status: "completed",
+      summary: "Done",
+      startedAt: now,
+      updatedAt: now,
+    });
+    tasks.create({
+      id: "active",
+      threadId: "thread-active",
+      projectId: "demo",
+      title: "Active",
+      status: "running",
+      summary: "Working",
+      startedAt: now,
+      updatedAt: now,
+    });
+
+    expect(tasks.clearFinished()).toEqual(["finished"]);
+    await store.save({ version: 1, tasks: tasks.all(), display: {} });
+    const restarted = new TaskRegistry();
+    restarted.restore((await store.load()).tasks);
+
+    expect(restarted.get("finished")).toBeUndefined();
+    expect(restarted.get("active")?.status).toBe("running");
   });
 });

@@ -1,5 +1,5 @@
 import type { AppServerNotification } from "./types.js";
-import { commandCategory, sanitizeSummary } from "../tasks/summary-builder.js";
+import { commandCategory } from "../tasks/summary-builder.js";
 import type { TaskRegistry } from "../tasks/task-registry.js";
 
 function record(value: unknown): Record<string, unknown> {
@@ -23,6 +23,9 @@ export class EventNormalizer {
     if (!threadId) return;
     const task = this.tasks.byThread(threadId);
     if (!task) return;
+    // External threads are deliberately monitor-only and are refreshed by
+    // thread/list polling. Do not turn their events into mutable deck tasks.
+    if (task.external) return;
 
     if (notification.method === "turn/started") {
       const turnId = text(record(params.turn).id);
@@ -65,7 +68,7 @@ export class EventNormalizer {
       notification.method === "item/completed"
     ) {
       const message = text(item.text) ?? text(item.message);
-      if (message) this.update(task.id, sanitizeSummary(message), 3);
+      if (message) this.update(task.id, message, 5, true);
     } else if (itemType === "commandExecution") {
       const command = text(item.command) ?? "command";
       this.update(task.id, commandCategory(command), 2);
@@ -80,10 +83,19 @@ export class EventNormalizer {
     }
   }
 
-  private update(taskId: string, summary: string, priority: number): void {
+  private update(
+    taskId: string,
+    summary: string,
+    priority: number,
+    includeDetail = false,
+  ): void {
     const current = this.summaryPriority.get(taskId) ?? 0;
     if (priority < current) return;
     this.summaryPriority.set(taskId, priority);
-    this.tasks.updateSummary(taskId, summary);
+    this.tasks.updateSummary(
+      taskId,
+      summary,
+      includeDetail ? summary : undefined,
+    );
   }
 }

@@ -1,8 +1,9 @@
 # CardPuter Codex Control Deck
 
-A trusted-LAN control surface for bridge-managed local Codex tasks. The desktop
-bridge owns `codex app-server`; the M5Stack Cardputer ADV receives only compact
-task state and a constrained `codexdeck.v1` action protocol.
+A trusted-LAN control surface for bridge-managed local Codex tasks. The native
+CodexDeck menu bar companion owns the bridge, `codex app-server`, projects,
+workflows, prompts, approvals, and diagnostics. The M5Stack Cardputer ADV
+receives only compact task state and a constrained `codexdeck.v1` protocol.
 
 > [!WARNING]
 > Version 1 has no device authentication. Run it only on a trusted, isolated
@@ -25,6 +26,17 @@ Tasks created outside this bridge are not monitored in v1.
 
 ## Requirements
 
+### Companion users
+
+- Apple Silicon Mac running macOS 13 or newer
+- Codex CLI installed and signed in
+- Cardputer firmware installed separately through Arduino CLI
+
+The packaged companion includes its own Node runtime and bridge dependencies.
+Normal use does not require pnpm, Node, Arduino CLI, or an open terminal.
+
+### Development
+
 - Node.js 20 or newer
 - pnpm 11
 - Codex CLI 0.140.0, the initially tested version
@@ -32,7 +44,34 @@ Tasks created outside this bridge are not monitored in v1.
 - M5Stack board index installed in Arduino CLI
 - M5Stack Cardputer ADV for upload and field verification
 
-## Desktop setup
+## Menu bar companion
+
+Build the local development-signed app:
+
+```bash
+pnpm package:mac
+open build/macos/CodexDeck.app
+```
+
+On first launch, the companion imports an existing `bridge.local.yaml` and
+`workflows.local.yaml` when present. Otherwise it guides the user through Codex
+sign-in and project selection. The menu bar icon is gray when stopped, amber
+when starting or degraded, cyan when ready, and red after a failure.
+
+Projects, workflows, network binding, Codex discovery, connected devices,
+structured input, approvals, recent logs, and Start at Login are all managed in
+the app. App-managed files live in:
+
+```text
+~/Library/Application Support/CardPuter Codex Control Deck/
+```
+
+The local build is development-signed. Public download distribution still
+requires a Developer ID Application certificate and Apple notarization.
+
+## Terminal bridge setup
+
+The terminal workflow remains available for development and recovery:
 
 ```bash
 pnpm install
@@ -95,6 +134,9 @@ pnpm format:check
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm mac:test
+pnpm package:mac
+pnpm mac:smoke
 pnpm codex:compat
 arduino-cli compile --profile adv firmware/cardputer
 arduino-cli compile --profile adv firmware/tests/control_deck_core
@@ -102,6 +144,7 @@ arduino-cli compile --profile adv firmware/tests/control_deck_core
 
 See [architecture](docs/architecture.md), [protocol](docs/protocol.md),
 [security](docs/security.md), [troubleshooting](docs/troubleshooting.md), and the
+[Mac companion checklist](docs/macos-companion-checklist.md) and
 [hardware checklist](docs/hardware-test-checklist.md). The latest local gate is
 recorded in [verification](docs/verification.md).
 

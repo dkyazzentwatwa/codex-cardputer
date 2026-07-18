@@ -91,6 +91,14 @@ describe("device WebSocket", () => {
     await waitFor(messages, () =>
       messages.some((message) => message.type === "macro.snapshot"),
     );
+    expect(server.devices()).toMatchObject([
+      {
+        deviceId: "cardputer-test",
+        deviceName: "CardPuter",
+        firmwareVersion: "0.1.0",
+        protocol: "codexdeck.v1",
+      },
+    ]);
     expect(messages.map((message) => message.type)).toEqual(
       expect.arrayContaining(["welcome", "task.snapshot", "macro.snapshot"]),
     );
@@ -125,6 +133,7 @@ describe("device WebSocket", () => {
       threadId: "thread-live",
       turnId: "turn-live",
       projectId: "demo",
+      workflowId: "review",
       title: "Live task",
       status: "running",
       summary: "Working",
@@ -139,11 +148,15 @@ describe("device WebSocket", () => {
       );
     await waitFor(messages, () => receivedLiveTask(messages));
     await waitFor(secondMessages, () => receivedLiveTask(secondMessages));
-    await new Promise<void>((resolve) => {
-      second.once("close", () => resolve());
-      second.close();
-    });
-
+    const liveUpsert = messages.find(
+      (message) =>
+        message.type === "task.upsert" &&
+        (message.task as { id?: string } | undefined)?.id === "task-live",
+    );
+    expect(liveUpsert?.task).not.toHaveProperty("workflowId");
+    const secondClosed = new Promise<void>((resolve) =>
+      second.once("close", () => resolve()),
+    );
     const reconnected = new WebSocket(`ws://127.0.0.1:${port}/device`);
     const reconnectMessages: Array<Record<string, unknown>> = [];
     reconnected.on("message", (data) =>
@@ -165,6 +178,7 @@ describe("device WebSocket", () => {
         capabilities: ["keyboard", "display", "hold-confirm"],
       }),
     );
+    await secondClosed;
     await waitFor(reconnectMessages, () =>
       reconnectMessages.some((message) => {
         if (message.type !== "task.snapshot") return false;
@@ -172,6 +186,67 @@ describe("device WebSocket", () => {
         return snapshot?.some((task) => task.id === "task-live") ?? false;
       }),
     );
+    expect(
+      server
+        .devices()
+        .filter((device) => device.deviceId === "cardputer-second"),
+    ).toHaveLength(1);
+
+    tasks.create({
+      id: "task-finished",
+      threadId: "thread-finished",
+      projectId: "demo",
+      title: "Finished task",
+      status: "failed",
+      summary: "Failed",
+      startedAt: now,
+      updatedAt: now,
+    });
+    const clearRequest = {
+      type: "tasks.clear.request",
+      requestId: "clear-1",
+    };
+    socket.send(JSON.stringify(clearRequest));
+    await waitFor(
+      messages,
+      () =>
+        messages.some(
+          (message) =>
+            message.type === "task.remove" &&
+            message.taskId === "task-finished",
+        ) &&
+        messages.some(
+          (message) =>
+            message.requestId === "clear-1" && message.type === "toast",
+        ),
+    );
+    await waitFor(reconnectMessages, () =>
+      reconnectMessages.some(
+        (message) =>
+          message.type === "task.remove" && message.taskId === "task-finished",
+      ),
+    );
+    socket.send(JSON.stringify(clearRequest));
+    await waitFor(
+      messages,
+      () =>
+        messages.filter((message) => message.requestId === "clear-1").length ===
+        2,
+    );
+    expect(tasks.get("task-finished")).toBeUndefined();
+    expect(tasks.get("task-live")).toBeDefined();
+    expect(
+      messages.filter(
+        (message) =>
+          message.type === "task.remove" && message.taskId === "task-finished",
+      ),
+    ).toHaveLength(1);
+    expect(
+      reconnectMessages.filter(
+        (message) =>
+          message.type === "task.remove" && message.taskId === "task-finished",
+      ),
+    ).toHaveLength(1);
 
     socket.send("{");
     await waitFor(messages, () =>

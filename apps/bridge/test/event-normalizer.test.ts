@@ -45,9 +45,10 @@ describe("EventNormalizer", () => {
         item: { type: "agentMessage", text: "A lower priority interim note" },
       },
     });
-    expect(tasks.require("task-1").summary).toBe(
-      "Implement the protocol adapter",
-    );
+    expect(tasks.require("task-1")).toMatchObject({
+      summary: "A lower priority interim note",
+      detail: "A lower priority interim note",
+    });
 
     normalizer.handle({
       method: "turn/completed",

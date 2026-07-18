@@ -2,6 +2,11 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+MODE=normal
+if [ "${1:-}" = "--bootstrap" ]; then
+  MODE=bootstrap
+  shift
+fi
 PORT=${1:-}
 
 if [ -z "$PORT" ]; then
@@ -29,5 +34,11 @@ NEW_PORT=$(arduino-cli board list | awk '/\/dev\/cu\.usbmodem/ { print $1; exit 
 if [ -n "$NEW_PORT" ]; then
   PORT=$NEW_PORT
 fi
-arduino-cli upload --profile adv -p "$PORT" "$ROOT/firmware/cardputer"
-echo "proof=uploaded target=cardputer-adv port=$PORT"
+if [ "$MODE" = bootstrap ]; then
+  BOOTSTRAP_FQBN='m5stack:esp32:m5stack_cardputer:FlashSize=8M,PartitionScheme=custom,CDCOnBoot=cdc,USBMode=default,UploadMode=default,PSRAM=disabled'
+  arduino-cli upload --fqbn "$BOOTSTRAP_FQBN" -p "$PORT" "$ROOT/firmware/cardputer"
+  echo "proof=uploaded target=cardputer-adv port=$PORT mode=bootstrap"
+else
+  arduino-cli upload --profile adv -p "$PORT" "$ROOT/firmware/cardputer"
+  echo "proof=uploaded target=cardputer-adv port=$PORT mode=tinyusb-cdc"
+fi

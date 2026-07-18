@@ -5,12 +5,18 @@ import { WebSocketServer } from "ws";
 
 import { DEVICE_PATH, MAX_FRAME_BYTES } from "@codexdeck/protocol";
 import type { ApprovalRequest, ServerMessage } from "@codexdeck/protocol";
+import type { UsageUpdate } from "@codexdeck/protocol";
 
 import type { ApprovalService } from "./approvals/approval-service.js";
 import { MdnsAdvertiser } from "./discovery/mdns.js";
 import { DeviceSession } from "./protocol/device-session.js";
+import type { ConnectedDevice } from "./protocol/device-session.js";
 import type { MessageRouter } from "./protocol/message-router.js";
-import type { ManagedTask, TaskRegistry } from "./tasks/task-registry.js";
+import {
+  toTaskSummary,
+  type ManagedTask,
+  type TaskRegistry,
+} from "./tasks/task-registry.js";
 
 export interface BridgeHealth {
   status: "ok" | "degraded";
@@ -31,6 +37,7 @@ export class ControlDeckServer extends EventEmitter {
   private readonly mdns = new MdnsAdvertiser();
   private readonly startedAt = Date.now();
   private listening = false;
+  private usage: UsageUpdate | undefined;
 
   constructor(
     private readonly bridgeVersion: string,
@@ -60,12 +67,30 @@ export class ControlDeckServer extends EventEmitter {
         router,
         () => {
           this.sessions.delete(session);
+          this.emit("devices", this.devices());
         },
+        (device) => {
+          for (const existing of this.sessions) {
+            if (
+              existing !== session &&
+              existing.info()?.deviceId === device.deviceId
+            ) {
+              this.sessions.delete(existing);
+              existing.close();
+            }
+          }
+          this.emit("devices", this.devices());
+        },
+        () => this.usage,
       );
       this.sessions.add(session);
+      this.emit("devices", this.devices());
     });
     tasks.on("upsert", (task: ManagedTask) =>
-      this.broadcast({ type: "task.upsert", task }),
+      this.broadcast({ type: "task.upsert", task: toTaskSummary(task) }),
+    );
+    tasks.on("remove", (taskId: string) =>
+      this.broadcast({ type: "task.remove", taskId }),
     );
     approvals.on("open", (approval: ApprovalRequest) =>
       this.broadcast({ type: "approval.open", approval }),
@@ -124,10 +149,21 @@ export class ControlDeckServer extends EventEmitter {
       status: codexReady ? "ok" : "degraded",
       bridgeVersion: this.bridgeVersion,
       codexReady,
-      connectedDevices: this.sessions.size,
+      connectedDevices: this.devices().length,
       activeTasks,
       uptimeSeconds: Math.floor((Date.now() - this.startedAt) / 1000),
     };
+  }
+
+  devices(): ConnectedDevice[] {
+    const byDeviceId = new Map<string, ConnectedDevice>();
+    for (const session of this.sessions) {
+      const device = session.info();
+      if (device) byDeviceId.set(device.deviceId, device);
+    }
+    return [...byDeviceId.values()].sort((left, right) =>
+      left.deviceName.localeCompare(right.deviceName),
+    );
   }
 
   broadcastMacros(): void {
@@ -135,6 +171,11 @@ export class ControlDeckServer extends EventEmitter {
       type: "macro.snapshot",
       macros: this.router.macroSnapshot(),
     });
+  }
+
+  setUsage(usage: UsageUpdate): void {
+    this.usage = usage;
+    this.broadcast(usage);
   }
 
   private broadcast(message: ServerMessage): void {

@@ -7,5 +7,7 @@ coverage/
 .env
 apps/bridge/config/*.local.yaml
 firmware/cardputer/secrets.h
+firmware/waveshare_amoled_18/secrets.h
 firmware/tests/**/build/
 build/
+apps/macos/.build/

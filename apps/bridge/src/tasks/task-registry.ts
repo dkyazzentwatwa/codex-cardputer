@@ -11,6 +11,23 @@ import { sanitizeSummary } from "./summary-builder.js";
 export interface ManagedTask extends TaskSummary {
   workflowId?: string;
   previousActiveStatus?: TaskStatus;
+  external?: boolean;
+  externalSource?: string;
+}
+
+const CLEARABLE_STATUSES = new Set<TaskStatus>([
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export function toTaskSummary(task: ManagedTask): TaskSummary {
+  const summary: ManagedTask = { ...task };
+  delete summary.workflowId;
+  delete summary.previousActiveStatus;
+  delete summary.external;
+  delete summary.externalSource;
+  return summary;
 }
 
 const VALID_TRANSITIONS: Record<TaskStatus, Set<TaskStatus>> = {
@@ -112,6 +129,45 @@ export class TaskRegistry extends EventEmitter {
     return created;
   }
 
+  createExternal(
+    task: Omit<ManagedTask, "elapsedSeconds" | "requiresAttention" | "macros" | "external">,
+  ): ManagedTask {
+    if (this.tasks.has(task.id)) return this.require(task.id);
+    const created: ManagedTask = {
+      ...task,
+      external: true,
+      elapsedSeconds: 0,
+      requiresAttention:
+        task.status === "waiting_approval" || task.status === "waiting_input",
+      macros: [],
+    };
+    this.tasks.set(created.id, created);
+    this.threadIndex.set(created.threadId, created.id);
+    this.emitTask(created);
+    return created;
+  }
+
+  updateExternal(taskId: string, status: TaskStatus, summary: string): ManagedTask {
+    const task = this.require(taskId);
+    if (!task.external) throw new Error("Task is not externally monitored");
+    task.status = status;
+    task.summary = sanitizeSummary(summary, 64);
+    task.updatedAt = new Date().toISOString();
+    task.requiresAttention = status === "waiting_approval" || status === "waiting_input";
+    task.macros = [];
+    this.emitTask(task);
+    return task;
+  }
+
+  remove(taskId: string): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task) return false;
+    this.tasks.delete(taskId);
+    if (this.threadIndex.get(task.threadId) === taskId) this.threadIndex.delete(task.threadId);
+    this.emit("remove", taskId);
+    return true;
+  }
+
   restore(tasks: ManagedTask[]): void {
     for (const task of tasks) {
       this.tasks.set(task.id, task);
@@ -153,6 +209,27 @@ export class TaskRegistry extends EventEmitter {
       });
   }
 
+  clearableCount(): number {
+    let count = 0;
+    for (const task of this.tasks.values()) {
+      if (CLEARABLE_STATUSES.has(task.status)) ++count;
+    }
+    return count;
+  }
+
+  clearFinished(): string[] {
+    const removed: string[] = [];
+    for (const [taskId, task] of this.tasks) {
+      if (!CLEARABLE_STATUSES.has(task.status)) continue;
+      this.tasks.delete(taskId);
+      if (this.threadIndex.get(task.threadId) === taskId)
+        this.threadIndex.delete(task.threadId);
+      removed.push(taskId);
+      this.emit("remove", taskId);
+    }
+    return removed;
+  }
+
   transition(
     taskId: string,
     status: TaskStatus,
@@ -185,6 +262,7 @@ export class TaskRegistry extends EventEmitter {
     task.requiresAttention = false;
     task.macros = macrosForStatus("running");
     delete task.pendingApprovalId;
+    delete task.detail;
     this.emitTask(task);
     return task;
   }
@@ -192,7 +270,7 @@ export class TaskRegistry extends EventEmitter {
   updateSummary(taskId: string, summary: string, detail?: string): ManagedTask {
     const task = this.require(taskId);
     task.summary = sanitizeSummary(summary, 64);
-    if (detail) task.detail = sanitizeSummary(detail, 160);
+    if (detail) task.detail = sanitizeSummary(detail, 768);
     task.updatedAt = new Date().toISOString();
     this.emitTask(task);
     return task;

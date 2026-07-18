@@ -57,7 +57,7 @@ export const taskSummarySchema = z
     title: z.string().trim().min(1).max(28),
     status: taskStatusSchema,
     summary: z.string().trim().min(1).max(64),
-    detail: z.string().trim().min(1).max(160).optional(),
+    detail: z.string().trim().min(1).max(768).optional(),
     startedAt: isoTimestampSchema,
     updatedAt: isoTimestampSchema,
     elapsedSeconds: z.number().int().nonnegative(),
@@ -155,6 +155,12 @@ export const deviceMessageSchema = z.discriminatedUnion("type", [
       decision: approvalDecisionSchema,
     })
     .strict(),
+  z
+    .object({
+      type: z.literal("tasks.clear.request"),
+      requestId: requestIdSchema,
+    })
+    .strict(),
   z.object({ type: z.literal("snapshot.request") }).strict(),
 ]);
 
@@ -195,6 +201,19 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     .object({
       type: z.literal("macro.snapshot"),
       macros: z.array(macroDescriptorSchema).max(20),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("usage.update"),
+      available: z.boolean(),
+      limitName: z.string().trim().min(1).max(32).optional(),
+      primaryRemainingPercent: z.number().int().min(0).max(100).optional(),
+      primaryResetsAt: z.number().int().nonnegative().optional(),
+      primaryWindowMinutes: z.number().int().positive().optional(),
+      secondaryRemainingPercent: z.number().int().min(0).max(100).optional(),
+      secondaryResetsAt: z.number().int().nonnegative().optional(),
+      secondaryWindowMinutes: z.number().int().positive().optional(),
     })
     .strict(),
   z

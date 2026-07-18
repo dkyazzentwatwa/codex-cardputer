@@ -44,6 +44,60 @@ void setup() {
   store.markAllStale();
   check(store.find("run")->status == TaskStatus::Stale, "offline stale marking");
 
+  TaskStore clearable;
+  clearable.upsert(makeTask("done", TaskStatus::Completed, false, "2026-07-15T12:00:00Z"));
+  clearable.upsert(makeTask("failed", TaskStatus::Failed, false, "2026-07-15T11:00:00Z"));
+  clearable.upsert(makeTask("cancelled", TaskStatus::Cancelled, false, "2026-07-15T10:00:00Z"));
+  clearable.upsert(makeTask("active", TaskStatus::Running, false, "2026-07-15T09:00:00Z"));
+  clearable.upsert(makeTask("stale", TaskStatus::Stale, false, "2026-07-15T08:00:00Z"));
+  check(clearable.clearableCount() == 3, "clearable terminal task count");
+  check(clearable.selectById("active"), "select active before terminal removal");
+  check(clearable.remove("done"), "remove finished task");
+  check(strcmp(clearable.selected()->id, "active") == 0, "selection survives removal before selected task");
+  check(clearable.remove("active"), "remove selected task");
+  check(clearable.selected() != nullptr, "removing selected task chooses useful neighbor");
+
+  check(keyboardShortcutCount() == 24, "keyboard shortcut catalog count");
+  check(keyboardShortcutPageCount() == 3, "keyboard shortcut page count");
+  check(strcmp(keyboardShortcutPageLabel(0), "TASKS") == 0 &&
+            strcmp(keyboardShortcutPageLabel(1), "NAV") == 0 &&
+            strcmp(keyboardShortcutPageLabel(2), "PANELS") == 0 &&
+            strcmp(keyboardShortcutPageLabel(3), "") == 0,
+        "keyboard shortcut page labels");
+  check(keyboardShortcutPageItemCount(0) == 8, "keyboard shortcut first page count");
+  check(keyboardShortcutPageItemCount(1) == 8 && keyboardShortcutPageItemCount(2) == 8,
+        "keyboard shortcut full page counts");
+  check(keyboardShortcutAt(keyboardShortcutCount()) == nullptr, "keyboard shortcut bounds");
+  bool keyboardCatalogValid = true;
+  bool keyboardIdsUnique = true;
+  for (size_t left = 0; left < keyboardShortcutCount(); ++left) {
+    const KeyboardShortcut* shortcut = keyboardShortcutAt(left);
+    keyboardCatalogValid = keyboardCatalogValid && shortcut && keyboardShortcutValid(*shortcut);
+    if (shortcut) {
+      const size_t pageStart = keyboardShortcutPageStart(shortcut->page);
+      const size_t pageCount = keyboardShortcutPageItemCount(shortcut->page);
+      keyboardCatalogValid = keyboardCatalogValid && left >= pageStart && left < pageStart + pageCount;
+    }
+    for (size_t right = left + 1; right < keyboardShortcutCount(); ++right) {
+      keyboardIdsUnique = keyboardIdsUnique && strcmp(shortcut->id, keyboardShortcutAt(right)->id) != 0;
+    }
+  }
+  check(keyboardCatalogValid, "keyboard shortcut validation");
+  check(keyboardIdsUnique, "keyboard shortcut ids unique");
+
+  check(deckThemeCount() == 5, "deck theme catalog count");
+  check(strcmp(deckThemeLabel(DeckTheme::NeonGrid), "NEON GRID") == 0 &&
+            strcmp(deckThemeLabel(DeckTheme::Terminal), "TERMINAL") == 0 &&
+            strcmp(deckThemeLabel(DeckTheme::AmberCrt), "AMBER CRT") == 0 &&
+            strcmp(deckThemeLabel(DeckTheme::Synthwave), "SYNTHWAVE") == 0 &&
+            strcmp(deckThemeLabel(DeckTheme::Ice), "ICE") == 0,
+        "deck theme labels");
+  bool themesValid = true;
+  for (size_t index = 0; index < deckThemeCount(); ++index) {
+    themesValid = themesValid && deckThemeValid(deckThemeAt(index));
+  }
+  check(themesValid && !deckThemeValid(static_cast<DeckTheme>(deckThemeCount())), "deck theme validation");
+
   ApprovalController approval;
   check(!approval.press(1000), "first approval press arms");
   check(approval.press(2000), "second approval press confirms");

@@ -102,6 +102,11 @@ void ControlDeckClient::begin(const String& host, uint16_t port) {
 void ControlDeckClient::update(bool wifiConnected) {
   if (!wifiConnected || host_.length() == 0) return;
   socket_.loop();
+  if (toast_[0] && toastExpiresAt_ && static_cast<int32_t>(millis() - toastExpiresAt_) >= 0) {
+    toast_[0] = '\0';
+    toastExpiresAt_ = 0;
+    ++revision_;
+  }
   if (welcomed_ && lastSeenMs_ && millis() - lastSeenMs_ > STALE_AFTER_MS) {
     codexdeck::copyText(toast_, sizeof(toast_), "Bridge heartbeat timed out");
     retryNow();
@@ -131,6 +136,7 @@ const codexdeck::MacroState* ControlDeckClient::globalMacro(size_t index) const 
 
 size_t ControlDeckClient::globalMacroCount() const { return globalMacroCount_; }
 const ApprovalState& ControlDeckClient::approval() const { return approval_; }
+const UsageState& ControlDeckClient::usage() const { return usage_; }
 const char* ControlDeckClient::toast() const { return toast_; }
 
 void ControlDeckClient::sendSelect(const char* taskId) {
@@ -204,6 +210,17 @@ void ControlDeckClient::sendApproval(const char* approvalId, const char* decisio
   sendJson(payload);
 }
 
+void ControlDeckClient::sendClearFinished() {
+  JsonDocument document;
+  document["type"] = "tasks.clear.request";
+  document["requestId"] = requestId();
+  String payload;
+  serializeJson(document, payload);
+  Serial.printf("[diag] action=tasks_clear status=requested app=control-deck count=%u\n",
+                tasks_.clearableCount());
+  sendJson(payload);
+}
+
 void ControlDeckClient::requestSnapshot() {
   sendJson("{\"type\":\"snapshot.request\"}");
 }
@@ -244,6 +261,7 @@ void ControlDeckClient::handleMessage(const uint8_t* payload, size_t length) {
     return;
   }
   const char* type = document["type"] | "";
+  const bool displayChanged = strcmp(type, "ping") != 0;
   lastSeenMs_ = millis();
   if (strcmp(type, "welcome") == 0) {
     welcomed_ = strcmp(document["protocol"] | "", "codexdeck.v1") == 0;
@@ -269,6 +287,14 @@ void ControlDeckClient::handleMessage(const uint8_t* payload, size_t length) {
       if (globalMacroCount_ >= codexdeck::MAX_GLOBAL_MACROS) break;
       parseMacro(source, globalMacros_[globalMacroCount_++]);
     }
+  } else if (strcmp(type, "usage.update") == 0) {
+    usage_.received = true;
+    usage_.available = document["available"] | false;
+    codexdeck::copyText(usage_.limitName, sizeof(usage_.limitName), document["limitName"] | "Codex");
+    usage_.primaryRemainingPercent = document["primaryRemainingPercent"] | -1;
+    usage_.primaryWindowMinutes = document["primaryWindowMinutes"] | 0;
+    usage_.secondaryRemainingPercent = document["secondaryRemainingPercent"] | -1;
+    usage_.secondaryWindowMinutes = document["secondaryWindowMinutes"] | 0;
   } else if (strcmp(type, "approval.open") == 0) {
     JsonObjectConst source = document["approval"].as<JsonObjectConst>();
     approval_.open = true;
@@ -285,6 +311,7 @@ void ControlDeckClient::handleMessage(const uint8_t* payload, size_t length) {
     if (strcmp(approval_.id, document["approvalId"] | "") == 0) approval_.open = false;
   } else if (strcmp(type, "toast") == 0 || strcmp(type, "error") == 0) {
     codexdeck::copyText(toast_, sizeof(toast_), document["message"] | "Bridge message");
+    toastExpiresAt_ = millis() + 3000;
   } else if (strcmp(type, "ping") == 0) {
     JsonDocument response;
     response["type"] = "pong";
@@ -293,7 +320,7 @@ void ControlDeckClient::handleMessage(const uint8_t* payload, size_t length) {
     serializeJson(response, serialized);
     sendJson(serialized);
   }
-  ++revision_;
+  if (displayChanged) ++revision_;
 }
 
 void ControlDeckClient::sendHello() {

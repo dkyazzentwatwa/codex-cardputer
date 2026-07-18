@@ -2,11 +2,13 @@
 
 ## Architecture
 
-This repository contains a Node.js/TypeScript desktop bridge and one Arduino
-CLI firmware target for the M5Stack Cardputer ADV. The bridge owns Codex App
-Server integration and exposes only the constrained `codexdeck.v1` WebSocket
-protocol to the device. The Cardputer never receives Codex credentials, raw
-terminal output, environment snapshots, or an arbitrary shell endpoint.
+This repository contains a native SwiftUI menu bar companion, its bundled
+Node.js/TypeScript bridge, and one Arduino CLI firmware target for the M5Stack
+Cardputer ADV. The companion owns bridge lifecycle and desktop interaction. The
+bridge owns Codex App Server integration and exposes only the constrained
+`codexdeck.v1` WebSocket protocol to the device. The Cardputer never receives
+Codex credentials, raw terminal output, environment snapshots, or an arbitrary
+shell endpoint.
 
 ## Commands
 
@@ -15,6 +17,8 @@ pnpm install
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm mac:test
+pnpm package:mac
 arduino-cli compile --profile adv firmware/cardputer
 ./tools/flash-firmware.sh /dev/cu.usbmodemXXXX
 ```
@@ -30,6 +34,7 @@ LAN listeners.
 - Device mutations must be enumerated, validated, and idempotent.
 - Device approval choices are limited to accept, decline, and cancel.
 - Structured `request_user_input` requests remain desktop-only in v1.
+- Keep management endpoints loopback-only and protected by a per-launch token.
 - Treat the LAN protocol as unauthenticated and trusted-network-only.
 - Report firmware states precisely as compile-ready, uploaded, or field-proven.
 

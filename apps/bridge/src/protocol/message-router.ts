@@ -6,7 +6,7 @@ import type {
 
 import type { ApprovalDecision } from "@codexdeck/protocol";
 import { sanitizeSummary } from "../tasks/summary-builder.js";
-import type { TaskRegistry } from "../tasks/task-registry.js";
+import { toTaskSummary, type TaskRegistry } from "../tasks/task-registry.js";
 import type { WorkflowRegistry } from "../workflows/workflow-registry.js";
 import { RequestCache } from "./request-cache.js";
 
@@ -80,6 +80,12 @@ export class MessageRouter {
 
     let responses: ServerMessage[];
     try {
+      if (
+        (message.type === "task.stop.request" || message.type === "task.followup.submit") &&
+        this.tasks.get(message.taskId)?.external
+      ) {
+        throw new Error("External sessions are monitor-only. Adopt it on desktop before controlling it.");
+      }
       switch (message.type) {
         case "task.stop.request":
           await this.runner.stop(message.taskId);
@@ -143,6 +149,20 @@ export class MessageRouter {
             },
           ];
           break;
+        case "tasks.clear.request": {
+          const cleared = this.tasks.clearFinished().length;
+          responses = [
+            {
+              type: "toast",
+              level: cleared ? "success" : "info",
+              message: cleared
+                ? `Cleared ${cleared} finished task${cleared === 1 ? "" : "s"}`
+                : "No finished tasks to clear",
+              requestId: message.requestId,
+            },
+          ];
+          break;
+        }
       }
     } catch (error) {
       responses = [errorMessage(error, message.requestId)];
@@ -154,7 +174,10 @@ export class MessageRouter {
   private handleRead(message: DeviceMessage): ServerMessage[] {
     if (message.type === "snapshot.request") {
       return [
-        { type: "task.snapshot", tasks: this.tasks.all().slice(0, 20) },
+        {
+          type: "task.snapshot",
+          tasks: this.tasks.all().slice(0, 20).map(toTaskSummary),
+        },
         { type: "macro.snapshot", macros: this.macroSnapshot() },
       ];
     }
