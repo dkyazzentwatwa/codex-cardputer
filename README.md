@@ -1,156 +1,169 @@
-# CardPuter Codex Control Deck
+# CodexDeck for ESP32
 
-A trusted-LAN control surface for bridge-managed local Codex tasks. The native
-CodexDeck menu bar companion owns the bridge, `codex app-server`, projects,
-workflows, prompts, approvals, and diagnostics. The M5Stack Cardputer ADV
-receives only compact task state and a constrained `codexdeck.v1` protocol.
+<p align="center">
+  <img src="assets/codexdeck-cardputer-banner.png" alt="A real M5Stack Cardputer ADV running CodexDeck, one of the supported ESP32 profiles" width="100%" />
+</p>
+
+<p align="center">
+  <strong>A small, local control deck for bridge-managed Codex work.</strong><br />
+  Your Mac stays in control. Your ESP32 device becomes the focused status, approval, and task surface.
+</p>
+
+> [!IMPORTANT]
+> **Public preview.** CodexDeck is actively evolving and has not been released as a notarized public macOS app. It currently includes profiles for the **M5Stack Cardputer ADV** and the **Waveshare AMOLED 1.8 ESP32-S3**.
+
+CodexDeck pairs a native macOS menu bar companion with a supported ESP32 control surface. The companion runs the local bridge and owns Codex App Server integration, project and workflow allowlists, prompts, approvals, and diagnostics. Each device sees only compact task state through the deliberately narrow `codexdeck.v1` protocol.
+
+The ESP32 device never receives Codex credentials, raw terminal output, environment snapshots, or an arbitrary shell endpoint.
+
+## Why it exists
+
+Codex work is often easier to supervise when it is visible away from the terminal. CodexDeck puts the things that need your attention on a focused physical interface:
+
+- Start an approved workflow or enabled Codex skill.
+- Watch bridge-managed tasks, four at a time, with clear status and attention states.
+- Stop, steer, or follow up on a running turn.
+- Review command and file-change approvals from the device.
+- Recover gracefully from Wi-Fi, bridge, WebSocket, or App Server interruption.
+
+Tasks started outside the CodexDeck bridge are intentionally not monitored in v1.
+
+## How it is built
+
+```text
+ESP32 device  <-->  constrained WebSocket protocol  <-->  local TypeScript bridge
+                                                              |
+                                                              v
+                                                     codex app-server (local stdio)
+                                                              |
+                                                              v
+                                                   native macOS menu bar companion
+```
+
+The Mac is the trust boundary. The bridge validates every device mutation, starts or resumes only allowlisted workflows, and keeps Codex App Server on local stdio. The device is a bounded input and display client, not a remote shell.
+
+## Safety model
 
 > [!WARNING]
-> Version 1 has no device authentication. Run it only on a trusted, isolated
-> private LAN. Never expose port `8765` through a tunnel, public listener, port
-> forward, or cloud relay.
+> Version 1 has **no device authentication**. Use it only on a private, controlled Wi-Fi network. Never expose port `8765` through a tunnel, public listener, port forward, or cloud relay.
 
-## What works
+- The LAN protocol is intentionally constrained, but unauthenticated and trusted-network-only.
+- Device approvals are limited to `accept`, `decline`, and `cancel`.
+- Normal approvals require two presses; high-risk approvals require a 1.5-second hold.
+- Structured `request_user_input` stays on the desktop.
+- The device receives redacted, bounded summaries rather than prompts, raw output, project paths, or secrets.
+- The companion-management API is loopback-only and protected by a per-launch token.
 
-- Launch allowlisted workflows and enabled Codex skills.
-- Monitor up to 20 bridge-managed tasks, four rows at a time.
-- Stop one turn, steer a running turn, or start a follow-up turn.
-- Route command and file-change approvals to every connected device.
-- Require two presses for normal approval and a 1.5 second hold for high risk.
-- Show `request_user_input` as `waiting_input`; answers stay on the desktop.
-- Discover the bridge over mDNS and fall back to the last saved private host.
-- Configure Wi-Fi from the Cardputer keyboard, including hidden SSIDs.
-- Recover from App Server, bridge, WebSocket, and Wi-Fi interruption.
+Read the full [security model](docs/security.md) before using the bridge on a network shared with anyone else.
 
-Tasks created outside this bridge are not monitored in v1.
+## What works today
 
-## Requirements
+- Native macOS 13+ SwiftUI menu bar companion with setup, project/workflow management, diagnostics, and bridge lifecycle control.
+- Local TypeScript bridge backed by `codex app-server --listen stdio://`.
+- mDNS bridge discovery, saved private-host fallback, and reconnect handling.
+- Cardputer ADV firmware with Wi-Fi setup, offline diagnostics, task views, task macros, follow-ups, and approval confirmation.
+- Waveshare AMOLED 1.8 ESP32-S3 touch-first port that shares the bridge protocol and shortcut catalog; its current status is compile-ready.
+- Bounded task and frame handling: up to 20 tasks, four task rows at a time, an 8 KB frame limit, and a fixed 32 KB JSON arena.
+- Allowlisted workflows and enabled skills, with strict configuration validation at the bridge boundary.
 
-### Companion users
+## Run the companion
 
-- Apple Silicon Mac running macOS 13 or newer
-- Codex CLI installed and signed in
-- Cardputer firmware installed separately through Arduino CLI
+### Everyday use
 
-The packaged companion includes its own Node runtime and bridge dependencies.
-Normal use does not require pnpm, Node, Arduino CLI, or an open terminal.
+The packaged companion contains its Node runtime and bridge dependencies. Normal use does not require pnpm, Node, Arduino CLI, or an open terminal.
 
-### Development
-
-- Node.js 20 or newer
-- pnpm 11
-- Codex CLI 0.140.0, the initially tested version
-- Arduino CLI
-- M5Stack board index installed in Arduino CLI
-- M5Stack Cardputer ADV for upload and field verification
-
-## Menu bar companion
-
-Build the local development-signed app:
+Build and open a local development-signed app:
 
 ```bash
 pnpm package:mac
 open build/macos/CodexDeck.app
 ```
 
-On first launch, the companion imports an existing `bridge.local.yaml` and
-`workflows.local.yaml` when present. Otherwise it guides the user through Codex
-sign-in and project selection. The menu bar icon is gray when stopped, amber
-when starting or degraded, cyan when ready, and red after a failure.
-
-Projects, workflows, network binding, Codex discovery, connected devices,
-structured input, approvals, recent logs, and Start at Login are all managed in
-the app. App-managed files live in:
+At first launch, the companion imports existing local YAML configuration when available; otherwise it guides you through Codex sign-in and project selection. Its configuration lives in:
 
 ```text
 ~/Library/Application Support/CardPuter Codex Control Deck/
 ```
 
-The local build is development-signed. Public download distribution still
-requires a Developer ID Application certificate and Apple notarization.
+The current local build is development-signed. Public download distribution still needs a Developer ID Application certificate and Apple notarization.
 
-## Terminal bridge setup
+### Development bridge
 
-The terminal workflow remains available for development and recovery:
+Requirements: Apple Silicon Mac on macOS 13+, Node.js 20+, pnpm 11, Codex CLI, Arduino CLI, and the board support package for the profile you want to build. A supported ESP32 device is required only for uploading and device verification.
 
 ```bash
 pnpm install
 cp apps/bridge/config/bridge.example.yaml apps/bridge/config/bridge.local.yaml
 cp apps/bridge/config/workflows.example.yaml apps/bridge/config/workflows.local.yaml
-```
-
-Edit `workflows.local.yaml`. Every `cwd` must be an existing absolute path.
-Then point `bridge.local.yaml` at it and run:
-
-```bash
 ./tools/start-bridge.sh
 ```
 
-The helper resolves the local configuration to an absolute path before pnpm
-enters the bridge package directory.
+Edit `workflows.local.yaml` before starting the bridge. Every workflow `cwd` must be an existing absolute path. With no `bindHost`, the bridge chooses the first private IPv4 interface and falls back to `127.0.0.1`; set `bindHost: 127.0.0.1` when developing without a device.
 
-With no `bindHost`, the bridge deterministically chooses the first private IPv4
-interface and falls back to `127.0.0.1` when no private interface exists. Use an
-explicit `bindHost: 127.0.0.1` for local-only development.
+The health endpoint is available at `http://HOST:8765/healthz`. Send `SIGHUP` to reload the workflow allowlist and enabled skill menu without interrupting active tasks.
 
-Check bridge health at `http://HOST:8765/healthz`. Send `SIGHUP` to reload the
-allowlist and enabled skill menu without restarting active tasks.
+## Firmware profiles
 
-## Firmware setup
+This repository uses **Arduino CLI only**. Select the profile that matches your hardware.
 
-This repository uses Arduino CLI only. The `adv` profile pins the Cardputer ADV
-FQBN and all required libraries in `firmware/cardputer/sketch.yaml`.
+### M5Stack Cardputer ADV
 
 ```bash
 arduino-cli compile --profile adv firmware/cardputer
-arduino-cli compile --profile adv firmware/tests/control_deck_core
-```
-
-Connect the Cardputer over USB, verify its port, then upload:
-
-```bash
 arduino-cli board list
 ./tools/flash-firmware.sh /dev/cu.usbmodemXXXX
 ```
 
-The first boot opens Wi-Fi setup. Choose a network, or press `M` for a hidden
-SSID. Passwords are masked and saved in ESP32 Preferences. The offline screen
-can reopen setup with `W`.
+On first boot, the Cardputer opens Wi-Fi setup. Choose a network or press `M` for a hidden SSID. Credentials are masked and saved in ESP32 Preferences. From the offline screen, press `W` to reopen setup.
 
-Run the on-device assertion sketch with:
+Run the device assertion sketch with:
 
 ```bash
 ./tools/test-firmware.sh /dev/cu.usbmodemXXXX
 ```
 
-The helper compiles, uploads, re-detects the USB modem port, monitors serial via
-Arduino CLI, and succeeds only after `TEST SUMMARY ... failed=0`.
+It compiles, uploads, re-detects the modem, and watches serial output. A successful device-run result ends with `TEST SUMMARY ... failed=0`.
 
-## Verification
+### Waveshare AMOLED 1.8 ESP32-S3
 
 ```bash
-pnpm lint
-pnpm format:check
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm mac:test
-pnpm package:mac
-pnpm mac:smoke
-pnpm codex:compat
-arduino-cli compile --profile adv firmware/cardputer
-arduino-cli compile --profile adv firmware/tests/control_deck_core
+./tools/build-waveshare-amoled.sh
+./tools/flash-waveshare-amoled.sh /dev/cu.usbmodemXXXX
 ```
 
-See [architecture](docs/architecture.md), [protocol](docs/protocol.md),
-[security](docs/security.md), [troubleshooting](docs/troubleshooting.md), and the
-[Mac companion checklist](docs/macos-companion-checklist.md) and
-[hardware checklist](docs/hardware-test-checklist.md). The latest local gate is
-recorded in [verification](docs/verification.md).
+This profile uses the 368×448 SH8601 AMOLED display and FT3168 touch controller. It shares CodexDeck's bridge protocol and shortcut catalog while using a touch-first interface. It is currently **compile-ready**; upload, display, and touch verification remain device-dependent. See [Waveshare target notes](docs/waveshare-amoled-18.md).
 
-## Proof state
+## Verify a checkout
 
-The repository can be `compile-ready` without hardware. `uploaded` requires a
-successful Arduino CLI upload log. `field-proven` requires the completed device
-checklist and recorded acceptance evidence. These states are never treated as
-interchangeable.
+```bash
+pnpm verify
+pnpm package:mac
+pnpm mac:smoke
+```
+
+`pnpm verify` runs linting, formatting, TypeScript checks, bridge and protocol tests, production builds, Swift companion tests, compatibility checks, and both Arduino compile gates. See the [verification record](docs/verification.md) for the latest recorded results.
+
+## Documentation
+
+- [Architecture and trust boundary](docs/architecture.md)
+- [Protocol](docs/protocol.md)
+- [Security model](docs/security.md)
+- [Mac companion checklist](docs/macos-companion-checklist.md)
+- [Hardware test checklist](docs/hardware-test-checklist.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
+## Proof states
+
+CodexDeck uses precise proof language:
+
+- **Compile-ready**: source compiles and automated gates pass; no device claim is implied.
+- **Uploaded**: Arduino CLI reported a successful firmware upload to the named ESP32 profile.
+- **Field-proven**: the relevant device checklist and recorded acceptance evidence were completed.
+
+The banner shows a real Cardputer ADV running the CodexDeck interface. That visual demonstration does not replace the documented device test checklist or a field-proven claim for either profile.
+
+## Contributing and public release
+
+Issues and focused contributions are welcome as the project moves toward a public release. Keep changes within the safety model: supported ESP32 profiles only, local stdio for App Server, loopback-only management, strict protocol validation, and no credentials or arbitrary shell access on the device.
+
+Before publishing a public binary, complete notarization, run the hardware checklist on the target device, and update the verification record with the resulting evidence.
