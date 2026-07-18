@@ -9,6 +9,15 @@
   Your Mac stays in control. Your ESP32 device becomes the focused status, approval, and task surface.
 </p>
 
+## At a glance
+
+- **Two ESP32 profiles:** M5Stack Cardputer ADV and Waveshare AMOLED 1.8 ESP32-S3.
+- **Codex control surface:** launch allowlisted workflows or enabled skills, monitor task state, stop or steer turns, and send follow-ups.
+- **Task-action macros:** each task can expose bounded actions such as review changes, run tests, commit changes, retry, approve, or reject.
+- **USB macro pad:** a 24-shortcut computer-control catalog across **Tasks**, **Navigation**, and **Panels**. It sends USB HID key chords only when the connected profile supports USB-OTG and the USB host is ready.
+- **Live status:** task attention, approvals, Wi-Fi, bridge health, and diagnostics stay visible on the device.
+- **Local by design:** the Mac owns Codex, credentials, project allowlists, prompts, and approvals; the ESP32 receives compact, redacted state only.
+
 > [!IMPORTANT]
 > **Public preview.** CodexDeck is actively evolving and has not been released as a notarized public macOS app. It currently includes profiles for the **M5Stack Cardputer ADV** and the **Waveshare AMOLED 1.8 ESP32-S3**.
 
