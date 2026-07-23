@@ -9,6 +9,18 @@
   Your Mac stays in control. Your ESP32 device becomes the focused status, approval, and task surface.
 </p>
 
+<p align="center">
+  <img src="assets/gallery/cardputer-codexdeck-01.jpg" alt="M5Stack Cardputer ADV showing the CodexDeck local companion connection screen" width="31%" />
+  <img src="assets/gallery/cardputer-codexdeck-02.jpg" alt="M5Stack Cardputer ADV showing the CodexDeck task macro pad" width="31%" />
+  <img src="assets/gallery/cardputer-codexdeck-03.jpg" alt="M5Stack Cardputer ADV showing CodexDeck navigation macros" width="31%" />
+</p>
+<p align="center">
+  <img src="assets/gallery/cardputer-codexdeck-04.jpg" alt="M5Stack Cardputer ADV showing CodexDeck panel macros" width="31%" />
+  <img src="assets/gallery/cardputer-codexdeck-05.jpg" alt="M5Stack Cardputer ADV showing the CodexDeck workflows and skills launcher" width="31%" />
+</p>
+
+<p align="center"><em>CodexDeck on the M5Stack Cardputer ADV.</em></p>
+
 ## At a glance
 
 - **Two ESP32 profiles:** M5Stack Cardputer ADV and Waveshare AMOLED 1.8 ESP32-S3.
