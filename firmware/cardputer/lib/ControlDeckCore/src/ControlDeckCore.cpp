@@ -102,6 +102,23 @@ const char* deckThemeLabel(DeckTheme theme) {
 
 bool deckThemeValid(DeckTheme theme) { return static_cast<size_t>(theme) < deckThemeCount(); }
 
+bool hidTransportValid(HidTransport transport) {
+  return transport == HidTransport::Usb || transport == HidTransport::Bluetooth;
+}
+
+HidTransport hidTransportFromStored(uint8_t stored) {
+  const HidTransport transport = static_cast<HidTransport>(stored);
+  return hidTransportValid(transport) ? transport : HidTransport::Usb;
+}
+
+const char* hidTransportLabel(HidTransport transport) {
+  return transport == HidTransport::Bluetooth ? "BLUETOOTH" : "USB";
+}
+
+bool hidTransportActive(HidTransport selected, HidTransport candidate) {
+  return hidTransportValid(selected) && hidTransportValid(candidate) && selected == candidate;
+}
+
 size_t keyboardShortcutCount() { return kKeyboardShortcutCount; }
 
 size_t keyboardShortcutPageCount() {

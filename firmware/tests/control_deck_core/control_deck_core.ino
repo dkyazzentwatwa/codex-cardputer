@@ -85,6 +85,21 @@ void setup() {
   check(keyboardCatalogValid, "keyboard shortcut validation");
   check(keyboardIdsUnique, "keyboard shortcut ids unique");
 
+  check(hidTransportValid(HidTransport::Usb) && hidTransportValid(HidTransport::Bluetooth),
+        "HID transport validation");
+  check(!hidTransportValid(static_cast<HidTransport>(2)), "invalid HID transport rejected");
+  check(hidTransportFromStored(0) == HidTransport::Usb && hidTransportFromStored(1) == HidTransport::Bluetooth,
+        "stored HID transport restored");
+  check(hidTransportFromStored(255) == HidTransport::Usb, "invalid stored HID transport defaults to USB");
+  check(strcmp(hidTransportLabel(HidTransport::Usb), "USB") == 0 &&
+            strcmp(hidTransportLabel(HidTransport::Bluetooth), "BLUETOOTH") == 0,
+        "HID transport labels");
+  check(hidTransportActive(HidTransport::Usb, HidTransport::Usb) &&
+            !hidTransportActive(HidTransport::Usb, HidTransport::Bluetooth) &&
+            hidTransportActive(HidTransport::Bluetooth, HidTransport::Bluetooth) &&
+            !hidTransportActive(HidTransport::Bluetooth, HidTransport::Usb),
+        "HID routes to exactly one selected transport");
+
   check(deckThemeCount() == 5, "deck theme catalog count");
   check(strcmp(deckThemeLabel(DeckTheme::NeonGrid), "NEON GRID") == 0 &&
             strcmp(deckThemeLabel(DeckTheme::Terminal), "TERMINAL") == 0 &&

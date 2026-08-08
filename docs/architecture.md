@@ -90,8 +90,10 @@ Production firmware contains:
 - WebSocket reconnect with capped exponential delay and jitter;
 - an 8 KB frame limit and a fixed 32 KB JSON decode arena;
 - normalized Cardputer keyboard input and a keymap diagnostic screen;
+- a persisted USB/Bluetooth HID selection, with TinyUSB and bonded NimBLE
+  keyboard backends routed through one validated shortcut catalog;
 - dashboard, task, macro, approval, follow-up, Wi-Fi, offline, diagnostics,
-  and stop-confirmation screens;
+  HID settings, pairing-reset confirmation, and stop-confirmation screens;
 - mutation blocking whenever the bridge handshake is not active.
 
 The display uses a 240 by 135 dark high-contrast layout with cyan selection,

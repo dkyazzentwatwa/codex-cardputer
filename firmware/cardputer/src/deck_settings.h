@@ -13,11 +13,13 @@ class DeckSettings {
   bool statusLightEnabled() const { return statusLightEnabled_; }
   bool partyLightEnabled() const { return partyLightEnabled_; }
   bool soundEnabled() const { return soundEnabled_; }
+  codexdeck::HidTransport hidTransport() const { return hidTransport_; }
   void cycleTheme(int direction);
   void cycleBrightness(int direction);
   void toggleStatusLight();
   void togglePartyLight();
   void toggleSound();
+  void setHidTransport(codexdeck::HidTransport transport);
 
  private:
   Preferences preferences_;
@@ -26,10 +28,12 @@ class DeckSettings {
   bool statusLightEnabled_ = true;
   bool partyLightEnabled_ = false;
   bool soundEnabled_ = true;
+  codexdeck::HidTransport hidTransport_ = codexdeck::HidTransport::Usb;
 
   void saveTheme();
   void saveBrightness();
   void saveStatusLight();
   void savePartyLight();
   void saveSound();
+  void saveHidTransport();
 };

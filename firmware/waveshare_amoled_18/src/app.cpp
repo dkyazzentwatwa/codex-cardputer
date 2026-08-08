@@ -42,6 +42,8 @@ enum class Screen : uint8_t {
   WifiList,
   Calibration,
   Diagnostics,
+  HidSettings,
+  ConfirmClearBonds,
 };
 
 enum class EntryMode : uint8_t { None, WifiSsid, WifiPassword, Followup };
@@ -171,6 +173,8 @@ uint32_t frameSig(uint32_t now) {
   mix(client.revision());
   mix(client.connected() ? 1u : 2u);
   mix(hid.ready() ? 1u : 2u);
+  mix(static_cast<uint32_t>(hid.transport()));
+  mix(hid.bluetoothBonded() ? 1u : 2u);
   mix(static_cast<uint32_t>(WiFi.status()));
   const char* activeToast = localToast.length() && now < toastUntil ? localToast.c_str() : client.toast();
   for (const char* p = activeToast; *p; ++p) mix(static_cast<uint8_t>(*p));
@@ -216,6 +220,12 @@ void sendShortcut(size_t index) {
   if (!shortcut) return;
   if (hid.send(*shortcut)) showToast(String("Sent ") + shortcut->label);
   else showToast(hid.status());
+}
+
+void selectHidTransport(codexdeck::HidTransport transport) {
+  hid.setTransport(transport);
+  settings.setHidTransport(transport);
+  showToast(String(codexdeck::hidTransportLabel(transport)) + " selected");
 }
 
 void handleTextTap(uint16_t x, uint16_t y) {
@@ -336,12 +346,19 @@ void handleTouch(const TouchEvent& event) {
     else if (y > 320 && x < 240) client.sendApproval(client.approval().id, "decline");
     else if (y > 320) client.sendApproval(client.approval().id, "cancel");
     screen = Screen::Detail;
-  } else if (screen == Screen::ConfirmClear || screen == Screen::ConfirmStop) {
+  } else if (screen == Screen::ConfirmClear || screen == Screen::ConfirmStop ||
+             screen == Screen::ConfirmClearBonds) {
     if (y > 275 && x > 180) {
       if (screen == Screen::ConfirmClear) client.sendClearFinished();
-      else if (client.tasks().selected()) client.sendStop(client.tasks().selected()->id);
+      else if (screen == Screen::ConfirmStop && client.tasks().selected()) client.sendStop(client.tasks().selected()->id);
+      else if (screen == Screen::ConfirmClearBonds) {
+        const bool bondStateKnown = hid.bluetoothStateKnown();
+        const bool removed = hid.clearBluetoothBonds();
+        showToast(!bondStateKnown ? "Select Bluetooth first"
+                                  : (removed ? "Bluetooth pairing cleared" : "No Bluetooth pairing"));
+      }
     }
-    screen = Screen::Dashboard;
+    screen = screen == Screen::ConfirmClearBonds ? Screen::HidSettings : Screen::Dashboard;
   } else if (screen == Screen::Usage) {
     if (y > 350) screen = Screen::Dashboard;
   } else if (screen == Screen::Settings) {
@@ -349,12 +366,21 @@ void handleTouch(const TouchEvent& event) {
       settingsSelected = min<size_t>(3, (y - 84) / 62);
       if (settingsSelected == 0) { settings.nextTheme(1); ui.theme(settings.theme()); }
       else if (settingsSelected == 1) { settings.nextBrightness(1); ui.brightness(settings.brightness()); }
+      else if (settingsSelected == 2) screen = Screen::HidSettings;
       else if (settingsSelected == 3) screen = Screen::Calibration;
     } else if (y >= 372) {
       if (x < 94) openWifi();
       else if (x < 184) screen = Screen::Diagnostics;
       else if (x < 268) screen = Screen::Calibration;
       else screen = client.connected() ? Screen::Dashboard : Screen::Offline;
+    }
+  } else if (screen == Screen::HidSettings) {
+    if (y >= 140 && y < 210) {
+      selectHidTransport(x < 184 ? codexdeck::HidTransport::Usb : codexdeck::HidTransport::Bluetooth);
+    } else if (y >= 220 && y < 295) {
+      screen = Screen::ConfirmClearBonds;
+    } else if (y >= 360) {
+      screen = Screen::Settings;
     }
   } else if (screen == Screen::Calibration) {
     TouchOrientation orientation = touch.orientation();
@@ -399,7 +425,7 @@ void handleTouch(const TouchEvent& event) {
 void render() {
   const char* toast = localToast.length() && millis() < toastUntil ? localToast.c_str() : client.toast();
   switch (screen) {
-    case Screen::Dashboard: ui.dashboard(client.tasks(), client.connected(), hid.ready(), toast); break;
+    case Screen::Dashboard: ui.dashboard(client.tasks(), client.connected(), hid.status(), toast); break;
     case Screen::Offline: ui.offline(network, client); break;
     case Screen::Detail:
       if (client.tasks().selected()) ui.detail(*client.tasks().selected(), scrollLine); else screen = Screen::Dashboard;
@@ -413,8 +439,14 @@ void render() {
       break;
     case Screen::ConfirmClear: ui.confirm("CLEAR FINISHED?", "Remove terminal task history? Active and stale tasks remain."); break;
     case Screen::ConfirmStop: ui.confirm("STOP TASK?", "Interrupt the selected Codex turn?"); break;
+    case Screen::ConfirmClearBonds:
+      ui.confirm("CLEAR BT PAIRING?", "Forget the bonded host and require Bluetooth pairing again.");
+      break;
     case Screen::Usage: ui.usage(client.usage()); break;
-    case Screen::Settings: ui.settings(settingsSelected, settings.theme(), settings.brightness(), hid.ready(), touch.available()); break;
+    case Screen::Settings: ui.settings(settingsSelected, settings.theme(), settings.brightness(), hid.status(), touch.available()); break;
+    case Screen::HidSettings:
+      ui.hidSettings(hid.transport(), hid.status(), hid.bluetoothStateKnown(), hid.bluetoothBonded(), toast);
+      break;
     case Screen::WifiList: ui.wifiList(network, wifiSelected); break;
     case Screen::Calibration: ui.calibration(touch.sample(), touch.orientation(), touch.available()); break;
     case Screen::Diagnostics: updateDiag(); ui.diagnostics(diag); break;
@@ -436,7 +468,7 @@ void setup() {
   ui.theme(settings.theme());
   ui.brightness(settings.brightness());
   ui.begin();
-  hid.begin();
+  hid.begin(settings.hidTransport());
   touch.begin();
   touch.setOrientation(TouchOrientation::unpack(settings.touchOrientation()));
 

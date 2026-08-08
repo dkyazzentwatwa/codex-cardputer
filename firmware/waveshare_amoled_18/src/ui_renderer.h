@@ -35,7 +35,7 @@ class AmoledRenderer {
   bool begin();
   void theme(codexdeck::DeckTheme value);
   void brightness(uint8_t value);
-  void dashboard(const codexdeck::TaskStore& tasks, bool bridge, bool hidReady, const char* toast);
+  void dashboard(const codexdeck::TaskStore& tasks, bool bridge, const char* hidStatus, const char* toast);
   void detail(const codexdeck::TaskState& task, size_t scrollLine);
   void keyboard(const char* hidStatus, size_t selected, size_t page, const char* toast);
   void macros(const ControlDeckClient& client, size_t selected);
@@ -43,7 +43,9 @@ class AmoledRenderer {
   void textEntry(const char* title, const String& value, bool masked, const char* hint);
   void confirm(const char* title, const char* body);
   void usage(const UsageState& usage);
-  void settings(size_t selected, codexdeck::DeckTheme current, uint8_t brightness, bool hidReady, bool touchReady);
+  void settings(size_t selected, codexdeck::DeckTheme current, uint8_t brightness, const char* hidStatus, bool touchReady);
+  void hidSettings(codexdeck::HidTransport transport, const char* status, bool bondKnown, bool bonded,
+                   const char* toast);
   void wifiList(const DeckNetwork& network, size_t selected);
   void offline(const DeckNetwork& network, const ControlDeckClient& client);
   void calibration(const TouchSample& sample, const TouchOrientation& orient, bool touchReady);

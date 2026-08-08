@@ -9,8 +9,10 @@ class AmoledSettings {
   void begin();
   codexdeck::DeckTheme theme() const { return theme_; }
   uint8_t brightness() const { return brightness_; }
+  codexdeck::HidTransport hidTransport() const { return hidTransport_; }
   void nextTheme(int direction);
   void nextBrightness(int direction);
+  void setHidTransport(codexdeck::HidTransport transport);
 
   // Touch orientation is stored as the 3-bit TouchOrientation::pack() value so
   // the calibration screen can correct the panel without a firmware reflash.
@@ -28,5 +30,6 @@ class AmoledSettings {
   uint8_t brightness_ = 255;
   uint8_t touchOrientation_ = 0;
   bool touchCalibrated_ = false;
+  codexdeck::HidTransport hidTransport_ = codexdeck::HidTransport::Usb;
   void save();
 };

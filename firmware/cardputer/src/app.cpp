@@ -29,6 +29,8 @@ enum class Screen : uint8_t {
   Keyboard,
   Keymap,
   Settings,
+  HidSettings,
+  ConfirmClearBonds,
 };
 
 DeckNetwork network;
@@ -49,6 +51,7 @@ size_t keyboardSelected = 0;
 size_t keyboardPage = 0;
 size_t wifiSelected = 0;
 size_t settingsSelected = 0;
+size_t hidSettingsSelected = 0;
 String selectedSsid;
 String wifiPassword;
 String followupText;
@@ -187,6 +190,13 @@ void sendKeyboardShortcut(size_t index, uint32_t nowMs) {
   keyboardToast = hidKeyboard.send(*shortcut) ? String("Sent: ") + shortcut->label : hidKeyboard.status();
   if (hidKeyboard.ready()) statusLight.pulse(255, 255, 255);
   keyboardToastUntilMs = nowMs + 3000;
+}
+
+void selectHidTransport(codexdeck::HidTransport transport) {
+  hidKeyboard.setTransport(transport);
+  deckSettings.setHidTransport(transport);
+  keyboardToast = String(codexdeck::hidTransportLabel(transport)) + " selected";
+  keyboardToastUntilMs = millis() + 3000;
 }
 
 void handleKeyboard(const InputEvent& event, uint32_t nowMs) {
@@ -406,8 +416,8 @@ void handleOtherScreens(const InputEvent& event) {
       screen = client.connected() ? Screen::Dashboard : Screen::Offline;
       return;
     }
-    if (event.up) { settingsSelected = (settingsSelected + 6) % 7; deckAudio.play(DeckTone::Move); }
-    if (event.down) { settingsSelected = (settingsSelected + 1) % 7; deckAudio.play(DeckTone::Move); }
+    if (event.up) { settingsSelected = (settingsSelected + 7) % 8; deckAudio.play(DeckTone::Move); }
+    if (event.down) { settingsSelected = (settingsSelected + 1) % 8; deckAudio.play(DeckTone::Move); }
     const int direction = event.left ? -1 : 1;
     if (settingsSelected == 0 && (event.left || event.right || event.enterPressed)) {
       deckSettings.cycleTheme(direction);
@@ -429,8 +439,36 @@ void handleOtherScreens(const InputEvent& event) {
       openWifiList();
       deckAudio.play(DeckTone::Select);
     } else if (settingsSelected == 6 && event.enterPressed) {
+      hidSettingsSelected = 0;
+      screen = Screen::HidSettings;
+      deckAudio.play(DeckTone::Select);
+    } else if (settingsSelected == 7 && event.enterPressed) {
       screen = Screen::Diagnostics;
       deckAudio.play(DeckTone::Select);
+    }
+  } else if (screen == Screen::HidSettings) {
+    if (event.back) {
+      screen = Screen::Settings;
+      return;
+    }
+    if (event.up || event.down) hidSettingsSelected = (hidSettingsSelected + 1) % 2;
+    if (hidSettingsSelected == 0 && (event.left || event.right || event.enterPressed)) {
+      const auto next = hidKeyboard.transport() == codexdeck::HidTransport::Usb
+                            ? codexdeck::HidTransport::Bluetooth
+                            : codexdeck::HidTransport::Usb;
+      selectHidTransport(next);
+    } else if (hidSettingsSelected == 1 && event.enterPressed) {
+      screen = Screen::ConfirmClearBonds;
+    }
+  } else if (screen == Screen::ConfirmClearBonds) {
+    if (event.back) screen = Screen::HidSettings;
+    else if (event.enterPressed) {
+      const bool bondStateKnown = hidKeyboard.bluetoothStateKnown();
+      const bool removed = hidKeyboard.clearBluetoothBonds();
+      keyboardToast = !bondStateKnown ? "Select Bluetooth first"
+                                     : (removed ? "Bluetooth pairing cleared" : "No Bluetooth pairing");
+      keyboardToastUntilMs = millis() + 3000;
+      screen = Screen::HidSettings;
     }
   } else if (screen == Screen::Diagnostics) {
     if (event.back) screen = client.connected() ? Screen::Dashboard : Screen::Offline;
@@ -489,6 +527,15 @@ void render(uint32_t nowMs) {
       ui.settings(settingsSelected, codexdeck::deckThemeLabel(deckSettings.theme()), deckSettings.brightness(),
                   deckSettings.statusLightEnabled(), deckSettings.partyLightEnabled(), deckSettings.soundEnabled());
       break;
+    case Screen::HidSettings:
+      ui.hidSettings(hidSettingsSelected, hidKeyboard.transport(), hidKeyboard.status(),
+                     hidKeyboard.bluetoothStateKnown(), hidKeyboard.bluetoothBonded(),
+                     millis() < keyboardToastUntilMs ? keyboardToast.c_str() : "");
+      break;
+    case Screen::ConfirmClearBonds:
+      ui.message("CLEAR BT PAIRING?", "Forget the bonded host and require Bluetooth pairing again.",
+                 "Enter clear  ` cancel");
+      break;
     case Screen::Keyboard:
       ui.keyboard(hidKeyboard.status(), keyboardSelected, keyboardPage,
                   millis() < keyboardToastUntilMs ? keyboardToast.c_str() : "");
@@ -545,7 +592,7 @@ void setup() {
   statusLight.begin(deckSettings.statusLightEnabled());
   statusLight.setPartyMode(deckSettings.partyLightEnabled());
   statusLight.pulse(0, 190, 255, 5000);
-  hidKeyboard.begin();
+  hidKeyboard.begin(deckSettings.hidTransport());
   const uint32_t loadScreenStartedAt = millis();
   ui.boot("Starting display...", 20);
   Serial.printf("[diag] action=display_init status=ok app=control-deck width=%d height=%d brightness=255\n",
@@ -618,7 +665,8 @@ void loop() {
     default: handleOtherScreens(event); break;
   }
 
-  const bool keyboardToastExpired = screen == Screen::Keyboard && keyboardToastUntilMs && nowMs >= keyboardToastUntilMs;
+  const bool keyboardToastExpired = (screen == Screen::Keyboard || screen == Screen::HidSettings) &&
+                                    keyboardToastUntilMs && nowMs >= keyboardToastUntilMs;
   if (keyboardToastExpired) keyboardToastUntilMs = 0;
   const bool timedScreen = screen == Screen::Offline || screen == Screen::Diagnostics;
   if (hasInput(event) || screen != screenAtLoopStart || seenRevision != client.revision() ||

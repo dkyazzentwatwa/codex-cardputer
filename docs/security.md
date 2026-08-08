@@ -29,6 +29,20 @@ Companion settings, workflows, state, and logs live under the user's
 Application Support directory. JSON files use mode `0600`; the directory uses
 mode `0700`. The app never copies or stores Codex credentials.
 
+## Bluetooth HID boundary
+
+Bluetooth HID is separate from the CodexDeck LAN protocol. It sends only the
+same fixed keyboard shortcuts available over USB and never carries task state,
+Codex credentials, bridge messages, or terminal output. USB is the default
+transport. BLE advertising starts only when the user selects Bluetooth in the
+local HID settings, and shortcut reports go to exactly one selected transport.
+
+Bluetooth uses bonded LE Secure Connections with Just Works pairing. This is
+convenient but does not authenticate the nearby host with a passcode. Pair only
+in a controlled location, verify the `CodexDeck Cardputer` or
+`CodexDeck AMOLED` device name, and use the confirmed Clear BT Pairing action
+before transferring the device or when a host should no longer reconnect.
+
 ## Constrained actions
 
 YAML defines allowlisted projects, workflows, Codex settings, and prompts. It

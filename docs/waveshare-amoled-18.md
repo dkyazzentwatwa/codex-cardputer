@@ -23,5 +23,10 @@ The ignored `secrets.h` file may provide `CODEXDECK_WIFI_SSID` and
 `CODEXDECK_WIFI_PASSWORD`. Saved Preferences credentials take precedence.
 Values are never printed to serial.
 
+The profile supports the same exclusive USB/Bluetooth HID selection as the
+Cardputer firmware. USB is the default. Open Settings, tap HID Status, select
+Bluetooth, and pair `CodexDeck AMOLED`. BLE advertising stops when USB is
+selected; clearing the saved bond requires a separate confirmation.
+
 Status is currently compile-ready. Upload and touch/display field proof still
 requires the Waveshare board to be connected.

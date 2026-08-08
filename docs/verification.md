@@ -1,5 +1,29 @@
 # Verification record
 
+## Bluetooth HID change — 2026-07-18
+
+The USB/Bluetooth HID implementation was compile-verified for both supported
+profiles using clean Arduino CLI builds:
+
+- Cardputer ADV: 1,671,703 bytes flash, 209,688 bytes static RAM, 117,992 bytes
+  dynamic memory free;
+- Waveshare AMOLED: 1,586,987 bytes flash, 213,072 bytes static RAM, 114,608
+  bytes dynamic memory free;
+- shared firmware assertion sketch: 290,319 bytes flash, 21,572 bytes static
+  RAM;
+- ESLint, changed-file Prettier checks, TypeScript typecheck/build, 10 protocol
+  tests, 39 bridge tests, and 6 Swift companion tests passed.
+
+The aggregate `pnpm verify` command remains blocked by four unchanged bridge
+files that fail the repository-wide Prettier check. The separately run Codex
+adapter compatibility check also reports a type assertion mismatch against the
+currently installed App Server schema. Neither failure is in the Bluetooth HID
+change set.
+
+No `/dev/cu.usbmodem*` device was present. Bluetooth pairing, bond recovery,
+exclusive transport routing on a host, upload, and concurrent Wi-Fi/BLE runtime
+behavior remain not field-proven for both profiles.
+
 Date: 2026-07-15
 
 ## Automated gate

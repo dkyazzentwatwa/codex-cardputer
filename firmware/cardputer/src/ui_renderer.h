@@ -29,6 +29,8 @@ class UiRenderer {
   void usage(const UsageState& usage);
   void settings(size_t selected, const char* theme, uint8_t brightness, bool statusLightEnabled, bool partyLightEnabled,
                 bool soundEnabled);
+  void hidSettings(size_t selected, codexdeck::HidTransport transport, const char* status, bool bondKnown,
+                   bool bonded, const char* toast);
   void keymap(const String& latest);
   void message(const char* title, const char* body, const char* footer = "` back");
   void present();

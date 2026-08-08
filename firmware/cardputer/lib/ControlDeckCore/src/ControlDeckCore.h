@@ -23,6 +23,16 @@ DeckTheme deckThemeAt(size_t index);
 const char* deckThemeLabel(DeckTheme theme);
 bool deckThemeValid(DeckTheme theme);
 
+enum class HidTransport : uint8_t {
+  Usb,
+  Bluetooth,
+};
+
+bool hidTransportValid(HidTransport transport);
+HidTransport hidTransportFromStored(uint8_t stored);
+const char* hidTransportLabel(HidTransport transport);
+bool hidTransportActive(HidTransport selected, HidTransport candidate);
+
 enum class TaskStatus : uint8_t {
   Starting,
   Running,

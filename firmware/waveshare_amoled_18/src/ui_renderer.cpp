@@ -171,14 +171,15 @@ void AmoledRenderer::button(int16_t x, int16_t y, int16_t w, int16_t h, const ch
   display_->setTextSize(1);
 }
 
-void AmoledRenderer::dashboard(const codexdeck::TaskStore& tasks, bool bridge, bool hidReady, const char* toast) {
+void AmoledRenderer::dashboard(const codexdeck::TaskStore& tasks, bool bridge, const char* hidStatus, const char* toast) {
+  const bool hidReady = hidStatus && (strcmp(hidStatus, "USB READY") == 0 || strcmp(hidStatus, "BT READY") == 0);
   header("CODEX DECK", bridge ? (hidReady ? "READY" : "HID") : "OFFLINE");
   panel(16, 72, 106, 48, palette_.good, palette_.panel, 12);
   panel(131, 72, 106, 48, palette_.warn, palette_.panel, 12);
   panel(246, 72, 106, 48, palette_.accent, palette_.panel, 12);
   label("ACTIVE", 29, 82, palette_.dim, 1); label(String(tasks.count()).c_str(), 29, 97, palette_.good, 3);
   label("ATTN", 144, 82, palette_.dim, 1); label("LIVE", 144, 97, palette_.warn, 2);
-  label("HID", 259, 82, palette_.dim, 1); label(hidReady ? "READY" : "PLUG USB", 259, 97, palette_.accent, 2);
+  label("HID", 259, 82, palette_.dim, 1); label(hidReady ? "READY" : (hidStatus ? hidStatus : "WAIT"), 259, 97, palette_.accent, hidReady ? 2 : 1);
   if (tasks.count() == 0) {
     panel(16, 140, 336, 130, bridge ? palette_.accent : palette_.warn, palette_.panel, 14);
     label(bridge ? "NO ACTIVE TASKS" : "BRIDGE OFFLINE", 57, 175, bridge ? palette_.accent : palette_.warn, 3);
@@ -301,10 +302,10 @@ void AmoledRenderer::usage(const UsageState& usage) {
   footer("Live Codex limits");
 }
 
-void AmoledRenderer::settings(size_t selected, codexdeck::DeckTheme current, uint8_t brightness, bool hidReady, bool touchReady) {
+void AmoledRenderer::settings(size_t selected, codexdeck::DeckTheme current, uint8_t brightness, const char* hidStatus, bool touchReady) {
   header("SETTINGS", "LOCAL");
   const char* rows[] = {"THEME", "BRIGHTNESS", "HID STATUS", "TOUCH STATUS"};
-  const String values[] = {codexdeck::deckThemeLabel(current), String(brightness), hidReady ? "READY" : "PLUG USB", touchReady ? "READY" : "MISSING"};
+  const String values[] = {codexdeck::deckThemeLabel(current), String(brightness), hidStatus ? hidStatus : "WAIT", touchReady ? "READY" : "MISSING"};
   for (size_t index = 0; index < 4; ++index) {
     const int y = 84 + index * 62;
     panel(20, y, 328, 48, index == selected ? palette_.accent : palette_.panelAlt, palette_.panel, 10);
@@ -316,6 +317,23 @@ void AmoledRenderer::settings(size_t selected, codexdeck::DeckTheme current, uin
   button(190, 372, 78, 30, "CAL", palette_.good);
   button(274, 372, 84, 30, "HOME", palette_.dim);
   footer("Tap row  DIAG shows Wi-Fi state  CAL = touch");
+}
+
+void AmoledRenderer::hidSettings(codexdeck::HidTransport transport, const char* status, bool bondKnown, bool bonded,
+                                 const char* toast) {
+  const bool ready = status && (strcmp(status, "USB READY") == 0 || strcmp(status, "BT READY") == 0);
+  header("HID SETTINGS", codexdeck::hidTransportLabel(transport));
+  panel(20, 78, 328, 48, ready ? palette_.good : palette_.warn, palette_.panel, 10);
+  label(status ? status : "HID WAIT", 38, 94, ready ? palette_.good : palette_.warn, 2);
+  label(!bondKnown ? "BOND UNKNOWN" : (bonded ? "BONDED" : "NOT BONDED"), 240, 98, palette_.dim, 1);
+  button(20, 150, 154, 50, "USB", palette_.accent, transport == codexdeck::HidTransport::Usb);
+  button(194, 150, 154, 50, "BLUETOOTH", palette_.violet,
+         transport == codexdeck::HidTransport::Bluetooth);
+  button(20, 232, 328, 50, "CLEAR BT PAIRING", palette_.warn);
+  wrapped("Only the selected transport receives shortcuts. Bluetooth advertises only while selected.",
+          30, 305, 30, 2, palette_.dim, 1);
+  button(20, 370, 328, 30, "BACK", palette_.dim);
+  footer(toast && toast[0] ? toast : "Tap transport  Clear requires confirmation");
 }
 
 void AmoledRenderer::wifiList(const DeckNetwork& network, size_t selected) {

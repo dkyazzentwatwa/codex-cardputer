@@ -86,3 +86,20 @@ re-detects the port before upload. No successful compile implies upload proof.
 Open Diagnostics with `D`, then Keymap with `K`. The diagnostic view shows
 normalized text and direction events. Cardputer arrow, Tab, Esc, and Delete
 behavior must be verified on hardware before claiming field proof.
+
+## Bluetooth keyboard does not appear
+
+Bluetooth advertising is intentionally off while USB is selected. Open the
+device's HID settings, select Bluetooth, and wait for `BT PAIRING`. In macOS
+System Settings, open Bluetooth and connect to `CodexDeck Cardputer` or
+`CodexDeck AMOLED`. `BT READY` appears only after the encrypted pairing
+handshake completes.
+
+If macOS remembers a stale pairing, select Bluetooth, choose
+**Clear BT Pairing** on the device, confirm the action, forget the keyboard in
+macOS Bluetooth settings, and pair again. Switching to USB disconnects
+Bluetooth and stops advertising without deleting the saved bond.
+
+Only the selected transport receives shortcuts. A connected USB cable can
+still provide power and serial diagnostics while Bluetooth is selected, but
+USB keyboard reports remain disabled until USB is selected again.

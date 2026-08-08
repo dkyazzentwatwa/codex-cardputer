@@ -26,7 +26,7 @@
 - **Two ESP32 profiles:** M5Stack Cardputer ADV and Waveshare AMOLED 1.8 ESP32-S3.
 - **Codex control surface:** launch allowlisted workflows or enabled skills, monitor task state, stop or steer turns, and send follow-ups.
 - **Task-action macros:** each task can expose bounded actions such as review changes, run tests, commit changes, retry, approve, or reject.
-- **USB macro pad:** a 24-shortcut computer-control catalog across **Tasks**, **Navigation**, and **Panels**. It sends USB HID key chords only when the connected profile supports USB-OTG and the USB host is ready.
+- **USB or Bluetooth macro pad:** a 24-shortcut computer-control catalog across **Tasks**, **Navigation**, and **Panels**. Choose one persisted HID transport; shortcuts are never mirrored to both hosts.
 - **Live status:** task attention, approvals, Wi-Fi, bridge health, and diagnostics stay visible on the device.
 - **Local by design:** the Mac owns Codex, credentials, project allowlists, prompts, and approvals; the ESP32 receives compact, redacted state only.
 
@@ -84,6 +84,7 @@ Read the full [security model](docs/security.md) before using the bridge on a ne
 - mDNS bridge discovery, saved private-host fallback, and reconnect handling.
 - Cardputer ADV firmware with Wi-Fi setup, offline diagnostics, task views, task macros, follow-ups, and approval confirmation.
 - Waveshare AMOLED 1.8 ESP32-S3 touch-first port that shares the bridge protocol and shortcut catalog; its current status is compile-ready.
+- USB and bonded Bluetooth Low Energy keyboard output on both firmware profiles, with USB as the upgrade-safe default.
 - Bounded task and frame handling: up to 20 tasks, four task rows at a time, an 8 KB frame limit, and a fixed 32 KB JSON arena.
 - Allowlisted workflows and enabled skills, with strict configuration validation at the bridge boundary.
 
@@ -137,6 +138,12 @@ arduino-cli board list
 
 On first boot, the Cardputer opens Wi-Fi setup. Choose a network or press `M` for a hidden SSID. Credentials are masked and saved in ESP32 Preferences. From the offline screen, press `W` to reopen setup.
 
+USB HID remains the default after installation or upgrade. To use Bluetooth,
+press `S` to open Settings, select **HID**, choose **Bluetooth**, then pair
+`CodexDeck Cardputer` in macOS Bluetooth settings. The selected transport is
+saved across reboots. The HID screen also shows pairing readiness and provides
+a confirmed **Clear BT Pairing** action.
+
 Run the device assertion sketch with:
 
 ```bash
@@ -153,6 +160,11 @@ It compiles, uploads, re-detects the modem, and watches serial output. A success
 ```
 
 This profile uses the 368×448 SH8601 AMOLED display and FT3168 touch controller. It shares CodexDeck's bridge protocol and shortcut catalog while using a touch-first interface. It is currently **compile-ready**; upload, display, and touch verification remain device-dependent. See [Waveshare target notes](docs/waveshare-amoled-18.md).
+
+For Bluetooth HID, open **Settings**, tap **HID Status**, select
+**Bluetooth**, and pair `CodexDeck AMOLED` in macOS Bluetooth settings. Select
+USB on the same screen to stop BLE advertising and return shortcut output to
+the wired host.
 
 ## Verify a checkout
 

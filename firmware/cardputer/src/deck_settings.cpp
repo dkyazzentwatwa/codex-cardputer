@@ -9,6 +9,7 @@ constexpr const char* kBrightnessKey = "bright";
 constexpr const char* kStatusLightKey = "statusled";
 constexpr const char* kPartyLightKey = "partyled";
 constexpr const char* kSoundKey = "sound";
+constexpr const char* kHidTransportKey = "hidmode";
 constexpr uint8_t kBrightnessLevels[] = {96, 160, 255};
 constexpr size_t kBrightnessLevelCount = sizeof(kBrightnessLevels) / sizeof(kBrightnessLevels[0]);
 
@@ -37,10 +38,11 @@ void DeckSettings::begin() {
   statusLightEnabled_ = preferences_.getBool(kStatusLightKey, true);
   partyLightEnabled_ = preferences_.getBool(kPartyLightKey, false);
   soundEnabled_ = preferences_.getBool(kSoundKey, true);
+  hidTransport_ = codexdeck::hidTransportFromStored(preferences_.getUChar(kHidTransportKey, 0));
   M5Cardputer.Display.setBrightness(brightness_);
-  Serial.printf("[diag] action=settings_load status=ok theme=%s brightness=%u status_led=%s party_led=%s\n",
+  Serial.printf("[diag] action=settings_load status=ok theme=%s brightness=%u status_led=%s party_led=%s hid=%s\n",
                 codexdeck::deckThemeLabel(theme_), brightness_, statusLightEnabled_ ? "on" : "off",
-                partyLightEnabled_ ? "on" : "off");
+                partyLightEnabled_ ? "on" : "off", codexdeck::hidTransportLabel(hidTransport_));
 }
 
 void DeckSettings::cycleTheme(int direction) {
@@ -87,8 +89,16 @@ void DeckSettings::toggleSound() {
   Serial.printf("[diag] action=settings_sound status=ok enabled=%s\n", soundEnabled_ ? "true" : "false");
 }
 
+void DeckSettings::setHidTransport(codexdeck::HidTransport transport) {
+  if (!codexdeck::hidTransportValid(transport) || transport == hidTransport_) return;
+  hidTransport_ = transport;
+  saveHidTransport();
+  Serial.printf("[diag] action=settings_hid status=ok transport=%s\n", codexdeck::hidTransportLabel(hidTransport_));
+}
+
 void DeckSettings::saveTheme() { preferences_.putUChar(kThemeKey, static_cast<uint8_t>(theme_)); }
 void DeckSettings::saveBrightness() { preferences_.putUChar(kBrightnessKey, brightness_); }
 void DeckSettings::saveStatusLight() { preferences_.putBool(kStatusLightKey, statusLightEnabled_); }
 void DeckSettings::savePartyLight() { preferences_.putBool(kPartyLightKey, partyLightEnabled_); }
 void DeckSettings::saveSound() { preferences_.putBool(kSoundKey, soundEnabled_); }
+void DeckSettings::saveHidTransport() { preferences_.putUChar(kHidTransportKey, static_cast<uint8_t>(hidTransport_)); }

@@ -32,6 +32,18 @@ items remain required.
       R, W, M, N, D, and K are verified in the keymap screen.
 - [ ] Long titles, summaries, and toast messages remain bounded.
 
+## USB and Bluetooth HID
+
+- [ ] Existing USB shortcuts still work after upgrading, with USB selected by default.
+- [ ] Bluetooth advertises only after Bluetooth is selected in HID settings.
+- [ ] macOS pairs with `CodexDeck Cardputer` and the display reaches `BT READY`.
+- [ ] Escape, Command, Control, Shift, Option, punctuation, and multi-modifier shortcuts work over BLE.
+- [ ] Reboot restores the selected transport and reconnects the bonded Bluetooth host.
+- [ ] Switching between USB and Bluetooth sends each shortcut to only the selected host.
+- [ ] Confirmed Clear BT Pairing removes the bond and requires a fresh macOS pairing.
+- [ ] Wi-Fi, bridge reconnection, and BLE HID remain stable together without reset loops or unsafe heap loss.
+- [ ] Repeat the applicable checks on the Waveshare AMOLED profile before calling its Bluetooth HID field-proven.
+
 ## Wi-Fi and discovery
 
 - [ ] First boot scans networks and masks password entry.

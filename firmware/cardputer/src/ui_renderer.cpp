@@ -233,7 +233,7 @@ void UiRenderer::keyboard(const char* hidStatus, size_t selected, size_t page, c
   const size_t start = codexdeck::keyboardShortcutPageStart(page);
   const size_t count = codexdeck::keyboardShortcutPageItemCount(page);
   auto& display = surface();
-  const bool ready = hidStatus && strcmp(hidStatus, "HID READY") == 0;
+  const bool ready = hidStatus && (strcmp(hidStatus, "USB READY") == 0 || strcmp(hidStatus, "BT READY") == 0);
   display.setTextColor(CYBER_VIOLET, BG);
   display.setCursor(7, 25);
   display.print(codexdeck::keyboardShortcutPageLabel(page));
@@ -241,7 +241,7 @@ void UiRenderer::keyboard(const char* hidStatus, size_t selected, size_t page, c
   display.fillCircle(171, 29, 2, ready ? GOOD : WARN);
   display.setTextColor(ready ? GOOD : WARN, PANEL);
   display.setCursor(177, 26);
-  display.print(ready ? "HID LIVE" : "HID WAIT");
+  display.print(hidStatus ? hidStatus : "HID WAIT");
   for (size_t item = 0; item < count; ++item) {
     const codexdeck::KeyboardShortcut* shortcut = codexdeck::keyboardShortcutAt(start + item);
     if (!shortcut) continue;
@@ -504,15 +504,52 @@ void UiRenderer::settings(size_t selected, const char* theme, uint8_t brightness
   display.setCursor(199, 87);
   display.print(soundEnabled ? "ON" : "OFF");
 
-  panel(5, 105, 112, 12, selected == 5 ? ACCENT : PANEL_ALT, PANEL, 4);
-  panel(123, 105, 112, 12, selected == 6 ? ACCENT : PANEL_ALT, PANEL, 4);
+  panel(5, 105, 72, 12, selected == 5 ? ACCENT : PANEL_ALT, PANEL, 4);
+  panel(84, 105, 72, 12, selected == 6 ? ACCENT : PANEL_ALT, PANEL, 4);
+  panel(163, 105, 72, 12, selected == 7 ? ACCENT : PANEL_ALT, PANEL, 4);
   display.setTextColor(selected == 5 ? ACCENT : TEXT, PANEL);
-  display.setCursor(14, 108);
+  display.setCursor(12, 108);
   display.print("WI-FI");
   display.setTextColor(selected == 6 ? ACCENT : TEXT, PANEL);
-  display.setCursor(132, 108);
-  display.print("DIAGNOSTICS");
+  display.setCursor(107, 108);
+  display.print("HID");
+  display.setTextColor(selected == 7 ? ACCENT : TEXT, PANEL);
+  display.setCursor(174, 108);
+  display.print("DIAG");
   footer("Up/Down select  </> change  Enter open  ` back");
+}
+
+void UiRenderer::hidSettings(size_t selected, codexdeck::HidTransport transport, const char* status, bool bondKnown,
+                             bool bonded, const char* toast) {
+  header("HID SETTINGS", codexdeck::hidTransportLabel(transport));
+  auto& display = surface();
+  const bool ready = status && (strcmp(status, "USB READY") == 0 || strcmp(status, "BT READY") == 0);
+  panel(5, 28, 112, 25, selected == 0 && transport == codexdeck::HidTransport::Usb ? ACCENT : PANEL_ALT,
+        transport == codexdeck::HidTransport::Usb ? 0x106D : PANEL, 5);
+  panel(123, 28, 112, 25, selected == 0 && transport == codexdeck::HidTransport::Bluetooth ? ACCENT : PANEL_ALT,
+        transport == codexdeck::HidTransport::Bluetooth ? 0x106D : PANEL, 5);
+  display.setTextColor(transport == codexdeck::HidTransport::Usb ? ACCENT : TEXT,
+                       transport == codexdeck::HidTransport::Usb ? 0x106D : PANEL);
+  display.setCursor(40, 37);
+  display.print("USB");
+  display.setTextColor(transport == codexdeck::HidTransport::Bluetooth ? ACCENT : TEXT,
+                       transport == codexdeck::HidTransport::Bluetooth ? 0x106D : PANEL);
+  display.setCursor(143, 37);
+  display.print("BLUETOOTH");
+
+  panel(5, 59, 230, 21, ready ? GOOD : WARN, PANEL, 5);
+  display.setTextColor(ready ? GOOD : WARN, PANEL);
+  display.setCursor(13, 66);
+  display.print(status ? status : "HID WAIT");
+  display.setTextColor(DIM, PANEL);
+  display.setCursor(130, 66);
+  display.print(!bondKnown ? "BOND UNKNOWN" : (bonded ? "BONDED" : "NOT BONDED"));
+
+  panel(5, 87, 230, 25, selected == 1 ? WARN : PANEL_ALT, PANEL, 5);
+  display.setTextColor(selected == 1 ? WARN : TEXT, PANEL);
+  display.setCursor(57, 96);
+  display.print("CLEAR BT PAIRING");
+  footer(toast && toast[0] ? toast : "Up/Down select  </> mode  Enter  ` back");
 }
 
 void UiRenderer::keymap(const String& latest) {
